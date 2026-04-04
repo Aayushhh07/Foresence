@@ -1,0 +1,149 @@
+@import 'tailwindcss/base';
+@import 'tailwindcss/components';
+@import 'tailwindcss/utilities';
+@import 'leaflet/dist/leaflet.css';
+@import 'leaflet-draw/dist/leaflet.draw.css';
+
+/* ─── Global Reset ─── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background-color: #f8fafc;
+  color: #0f172a;
+}
+
+/* ─── Scrollbar ─── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: #f1f5f9; }
+::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+/* ─── Leaflet Map overrides ─── */
+.leaflet-container {
+  font-family: 'Inter', system-ui, sans-serif;
+  border-radius: 12px;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px !important;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.15) !important;
+  border: 1px solid #e2e8f0;
+  padding: 0 !important;
+}
+.leaflet-popup-content { margin: 0 !important; }
+.leaflet-popup-tip-container { display: none; }
+
+/* ─── Health Score Gauge ─── */
+.health-gauge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.health-gauge svg { transform: rotate(-90deg); }
+.health-gauge-text {
+  position: absolute;
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: #0f172a;
+}
+
+/* ─── Severity Badges ─── */
+.badge-critical { @apply bg-red-100 text-red-700 border border-red-200; }
+.badge-high     { @apply bg-orange-100 text-orange-700 border border-orange-200; }
+.badge-medium   { @apply bg-yellow-100 text-yellow-700 border border-yellow-200; }
+.badge-low      { @apply bg-blue-100 text-blue-700 border border-blue-200; }
+.badge-healthy  { @apply bg-green-100 text-green-700 border border-green-200; }
+.badge-warning  { @apply bg-yellow-100 text-yellow-700 border border-yellow-200; }
+
+/* ─── Card base ─── */
+.card {
+  @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+}
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-md hover:border-slate-300 hover:-translate-y-0.5;
+}
+
+/* ─── Stat Card ─── */
+.stat-card {
+  @apply card p-5 flex flex-col gap-1;
+}
+
+/* ─── Sidebar ─── */
+.sidebar-link {
+  @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 hover:text-white
+         hover:bg-white/10 transition-all duration-200 font-medium text-sm cursor-pointer;
+}
+.sidebar-link.active {
+  @apply bg-forest-600/20 text-forest-400 border border-forest-500/30;
+}
+.sidebar-link-icon {
+  @apply w-5 h-5 flex-shrink-0;
+}
+
+/* ─── Button variants ─── */
+.btn-primary {
+  @apply bg-forest-600 hover:bg-forest-700 text-white font-semibold px-4 py-2 rounded-lg
+         transition-all duration-200 text-sm shadow-sm inline-flex items-center gap-2;
+}
+.btn-secondary {
+  @apply bg-white hover:bg-slate-50 text-slate-700 font-semibold px-4 py-2 rounded-lg
+         border border-slate-200 transition-all duration-200 text-sm inline-flex items-center gap-2;
+}
+.btn-danger {
+  @apply bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-lg
+         transition-all duration-200 text-sm inline-flex items-center gap-2;
+}
+.btn-ghost {
+  @apply text-slate-500 hover:text-slate-700 hover:bg-slate-100 font-medium px-3 py-1.5
+         rounded-lg transition-all duration-200 text-sm inline-flex items-center gap-2;
+}
+
+/* ─── Form elements ─── */
+.input {
+  @apply w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-800
+         focus:outline-none focus:ring-2 focus:ring-forest-500/40 focus:border-forest-500
+         transition-all duration-200 bg-white placeholder-slate-400;
+}
+.label {
+  @apply block text-xs font-semibold text-slate-600 uppercase tracking-wide mb-1;
+}
+
+/* ─── Status indicator dot ─── */
+.status-dot {
+  @apply inline-block w-2 h-2 rounded-full flex-shrink-0;
+}
+.status-dot.healthy   { @apply bg-green-500 animate-pulse; }
+.status-dot.warning   { @apply bg-yellow-500 animate-pulse; }
+.status-dot.critical  { @apply bg-red-500 animate-pulse; }
+.status-dot.connected { @apply bg-green-500; }
+.status-dot.offline   { @apply bg-slate-400; }
+
+/* ─── Recharts customization ─── */
+.recharts-tooltip-wrapper { z-index: 1000; }
+
+/* ─── Animations ─── */
+@keyframes fadeIn   { from { opacity: 0 } to { opacity: 1 } }
+@keyframes slideIn  { from { transform: translateY(-8px); opacity: 0 } to { transform: translateY(0); opacity: 1 } }
+@keyframes shimmer  { 0% { background-position: -200% 0 } 100% { background-position: 200% 0 } }
+
+.animate-fade-in  { animation: fadeIn 0.3s ease-in-out; }
+.animate-slide-in { animation: slideIn 0.25s ease-out; }
+
+/* Skeleton loader */
+.skeleton {
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: 6px;
+}
+
+/* ─── Toast overrides ─── */
+.Toastify__toast { border-radius: 10px !important; font-family: 'Inter', sans-serif !important; font-size: 14px !important; }
+.Toastify__toast--success { border-left: 3px solid #16a34a !important; }
+.Toastify__toast--error   { border-left: 3px solid #dc2626 !important; }
+.Toastify__toast--warning { border-left: 3px solid #d97706 !important; }
