@@ -4,6 +4,7 @@ FastAPI application entry point.
 import logging
 import asyncio
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -11,7 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import connect_db, close_db
 from app.core.redis_client import connect_redis, close_redis
-from app.api.routes import zones, alerts, snapshots, health
+from app.api.routes import zones, alerts, snapshots, health, demo
 from app.api.websocket import router as ws_router
 from app.scheduler.scheduler import start_scheduler, stop_scheduler
 
@@ -44,7 +45,7 @@ async def lifespan(app: FastAPI):
     scheduler.add_job(
         run_all_zone_scans,
         trigger="date",
-        run_date=asyncio.get_event_loop().time() + 30,
+        run_date=datetime.utcnow() + timedelta(seconds=30),
         id="initial_scan",
         replace_existing=True,
         name="Initial Zone Scan (30s delay)",
@@ -82,6 +83,7 @@ app.include_router(zones.router)
 app.include_router(alerts.router)
 app.include_router(snapshots.router)
 app.include_router(health.router)
+app.include_router(demo.router)
 app.include_router(ws_router)
 
 

@@ -5,27 +5,27 @@ import os
 
 
 class Settings(BaseSettings):
-    # Copernicus credentials
-    copernicus_username: str
-    copernicus_password: str
+    # Copernicus credentials (optional for demo mode)
+    copernicus_username: str = "demo"
+    copernicus_password: str = "demo"
 
-    # MongoDB
-    mongodb_uri: str
+    # MongoDB (required — must be a real connection string)
+    mongodb_uri: str = ""
     db_name: str = "foresence"
 
-    # Cloudflare R2
-    cloudflare_r2_access_key: str
-    cloudflare_r2_secret_key: str
+    # Cloudflare R2 (optional — falls back to local static files)
+    cloudflare_r2_access_key: str = "demo"
+    cloudflare_r2_secret_key: str = "demo"
     cloudflare_r2_bucket_name: str = "foresence-images"
-    cloudflare_r2_endpoint: str
-    cloudflare_r2_public_url: str
+    cloudflare_r2_endpoint: str = "https://demo.r2.cloudflarestorage.com"
+    cloudflare_r2_public_url: str = "https://demo.r2.dev"
 
-    # Redis
-    upstash_redis_url: str
+    # Redis (optional — falls back to in-memory locks)
+    upstash_redis_url: str = ""
 
-    # SendGrid
-    sendgrid_api_key: str
-    alert_from_email: str
+    # SendGrid (optional — emails skipped if not set)
+    sendgrid_api_key: str = "SG.demo"
+    alert_from_email: str = "demo@demo.com"
 
     # Scan config
     scan_interval_hours: int = 12

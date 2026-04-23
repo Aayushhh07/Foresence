@@ -31,7 +31,10 @@ async def health_check():
     redis_status = "connected"
     try:
         redis = get_redis()
-        await redis.ping()
+        if redis is None:
+            redis_status = "memory-only (no Redis URL configured)"
+        else:
+            await redis.ping()
     except Exception as e:
         redis_status = f"error: {str(e)[:50]}"
 

@@ -1,5 +1,10 @@
+import { useState } from 'react';
 import { useLocation } from 'react-router-dom';
+import { toast } from 'react-toastify';
 import useAppStore from '../../store/appStore';
+import { alertsApi } from '../../services/api';
+import { useZones } from '../../hooks/useZones';
+import api from '../../services/api';
 
 const PAGE_TITLES = {
   '/': { title: 'Map Dashboard', subtitle: 'Monitor forest zones in real-time' },
@@ -11,10 +16,29 @@ const PAGE_TITLES = {
 export default function Header() {
   const location = useLocation();
   const page = PAGE_TITLES[location.pathname] || { title: 'Foresence', subtitle: '' };
-  const { zones, alerts } = useAppStore();
+  const { zones, alerts, setAlerts } = useAppStore();
+  const { fetchZones } = useZones();
+  const [seeding, setSeeding] = useState(false);
 
   const criticalZones = zones.filter((z) => z.status === 'critical').length;
   const newAlerts = alerts.filter((a) => a.status === 'new').length;
+
+  const handleSeedDemo = async () => {
+    setSeeding(true);
+    try {
+      const res = await api.post('/api/demo/seed');
+      toast.success(res.data.message || '✅ Demo data seeded!', { autoClose: 5000 });
+      // Refresh zones and alerts
+      await fetchZones();
+      const alertRes = await alertsApi.list({ limit: 50 });
+      const data = alertRes.data.data;
+      setAlerts(data?.alerts || [], data?.total || 0);
+    } catch (err) {
+      toast.error('Seed failed: ' + err.message);
+    } finally {
+      setSeeding(false);
+    }
+  };
 
   return (
     <header className="flex items-center justify-between px-6 py-3 bg-white border-b border-slate-200">
@@ -24,8 +48,28 @@ export default function Header() {
         <p className="text-xs text-slate-500">{page.subtitle}</p>
       </div>
 
-      {/* Stats pills */}
+      {/* Stats pills + Seed button */}
       <div className="flex items-center gap-3">
+        {/* Seed Demo Button */}
+        <button
+          id="seed-demo-btn"
+          onClick={handleSeedDemo}
+          disabled={seeding}
+          className="flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-400 text-white text-xs font-semibold px-3 py-1.5 rounded-full transition-colors shadow-sm"
+        >
+          {seeding ? (
+            <>
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+              </svg>
+              Seeding...
+            </>
+          ) : (
+            <span>🌱 Seed Demo Data</span>
+          )}
+        </button>
+
         {criticalZones > 0 && (
           <div className="flex items-center gap-1.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold px-3 py-1.5 rounded-full animate-pulse">
             <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
