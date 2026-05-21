@@ -1,23 +1,38 @@
-# Legacy path: use ../render.yaml at repo root for Blueprint deploys.
+# Render Blueprint — repo root: Foresence/
+# Dashboard: New → Blueprint → connect GitHub repo → Render reads this file.
 services:
   - type: web
-    name: foresence-backend
+    name: foresence-api
     runtime: docker
+    rootDir: backend
     dockerfilePath: ./Dockerfile
     plan: starter
     healthCheckPath: /api/health
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.0
+      - key: APP_MODE
+        value: prod
+      - key: ENABLE_DEMO_ROUTES
+        value: "true"
+      - key: ENABLE_PREDEFINED_ZONES
+        value: "false"
+      - key: DB_NAME
+        value: foresence
+      - key: SCAN_INTERVAL_HOURS
+        value: "12"
+      - key: NDVI_DROP_THRESHOLD
+        value: "0.15"
+      - key: CONFIDENCE_THRESHOLD
+        value: "0.70"
+      # Set these in Render Dashboard (sync: false = secret / manual entry)
+      - key: MONGODB_URI
+        sync: false
+      - key: UPSTASH_REDIS_URL
+        sync: false
       - key: COPERNICUS_USERNAME
         sync: false
       - key: COPERNICUS_PASSWORD
         sync: false
-      - key: MONGODB_URI
-        sync: false
-      - key: DB_NAME
-        value: foresence
       - key: CLOUDFLARE_R2_ACCESS_KEY
         sync: false
       - key: CLOUDFLARE_R2_SECRET_KEY
@@ -28,18 +43,10 @@ services:
         sync: false
       - key: CLOUDFLARE_R2_PUBLIC_URL
         sync: false
-      - key: UPSTASH_REDIS_URL
-        sync: false
       - key: SENDGRID_API_KEY
         sync: false
       - key: ALERT_FROM_EMAIL
         sync: false
-      - key: SCAN_INTERVAL_HOURS
-        value: "12"
-      - key: NDVI_DROP_THRESHOLD
-        value: "0.15"
-      - key: CONFIDENCE_THRESHOLD
-        value: "0.70"
       - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL

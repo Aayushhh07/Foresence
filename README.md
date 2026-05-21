@@ -772,17 +772,14 @@ Demo seed creates three sample Indian forest zones, 60 days of NDVI snapshots, a
 
 ## Deployment
 
-### Backend — Render
+**Full step-by-step guide:** see **[DEPLOYMENT.md](./DEPLOYMENT.md)** (Render backend + Vercel frontend, env vars, CORS, WebSocket, checklist).
 
-`backend/render.yaml` is included. Set all environment variables in the Render dashboard. Use a paid plan for always-on scheduling (free tier may sleep).
+| Platform | Config files |
+|----------|----------------|
+| **Render** | `render.yaml` (repo root), `backend/Dockerfile`, `backend/.dockerignore` |
+| **Vercel** | `frontend/vercel.json`, env: `VITE_API_URL`, `VITE_WS_URL` (`wss://` in production) |
 
-### Frontend — Vercel
-
-- Root directory: `frontend`
-- Build: `npm run build`
-- Env: `VITE_API_URL`, `VITE_WS_URL` pointing to your deployed API
-
-### Docker
+### Docker (local / self-hosted)
 
 ```bash
 docker build -t foresense-api ./backend
