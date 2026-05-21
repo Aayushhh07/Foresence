@@ -5,12 +5,21 @@ import logging
 from datetime import datetime
 
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
 
 from app.core.database import get_db
 from app.core.redis_client import get_redis
+from app.models.zone import GeoJSONPolygon
+from app.services.sentinel_service import check_satellite_availability
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/health", tags=["health"])
+
+
+class SatelliteCheckRequest(BaseModel):
+    geojson: GeoJSONPolygon
+    lookback_days: int = Field(default=30, ge=1, le=180)
+    require_copernicus_auth: bool = False
 
 
 @router.get("", response_model=dict)
@@ -79,4 +88,29 @@ async def health_check():
             "last_scan_at": last_scan_at,
         },
         "message": f"System is {overall}",
+    }
+
+
+@router.post("/satellite-check", response_model=dict)
+async def satellite_check(payload: SatelliteCheckRequest):
+    """
+    Validate satellite API reachability and recent scene availability for a polygon.
+    """
+    check = await check_satellite_availability(
+        geojson_coords=payload.geojson.coordinates,
+        lookback_days=payload.lookback_days,
+        require_copernicus_auth=payload.require_copernicus_auth,
+    )
+
+    stac_scene = check.get("stac", {}).get("latest_scene")
+    cop_scene = check.get("copernicus", {}).get("latest_scene")
+    has_scene = bool(stac_scene or cop_scene)
+
+    return {
+        "success": True,
+        "data": {
+            **check,
+            "has_recent_scene": has_scene,
+        },
+        "message": "Satellite connectivity check complete",
     }

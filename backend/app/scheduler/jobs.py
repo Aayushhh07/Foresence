@@ -24,8 +24,18 @@ logger = logging.getLogger(__name__)
 
 
 async def scan_single_zone(zone_id: str) -> None:
+    """Run the scan pipeline for the current date range (default last 30 days)."""
+    await scan_single_zone_for_date_range(zone_id)
+
+
+async def scan_single_zone_for_date_range(
+    zone_id: str,
+    start_date: Optional[datetime] = None,
+    end_date: Optional[datetime] = None,
+    scan_id: Optional[str] = None,
+) -> Optional[dict]:
     """
-    Run the full satellite scan pipeline for one zone.
+    Run the full satellite scan pipeline for one zone within a specific date range.
     Step 1: Fetch Sentinel-2 bands
     Step 2: Compute NDVI + EVI
     Step 3: Store snapshot
@@ -33,33 +43,36 @@ async def scan_single_zone(zone_id: str) -> None:
     Step 5: Create alert if triggered
     """
     db = get_db()
-    scan_id = str(uuid.uuid4())[:8]
+    if not scan_id:
+        scan_id = str(uuid.uuid4())[:8]
 
     try:
         oid = ObjectId(zone_id)
     except Exception:
         logger.error(f"Invalid zone_id: {zone_id}")
-        return
+        return None
 
     zone = await db["zones"].find_one({"_id": oid})
     if not zone:
         logger.error(f"Zone not found: {zone_id}")
-        return
+        return None
 
     zone_name = zone.get("name", zone_id)
-    logger.info(f"[{scan_id}] Starting scan for zone: {zone_name}")
+    logger.info(f"[{scan_id}] Starting scan for zone: {zone_name} (Range: {start_date} to {end_date})")
 
     # Acquire distributed lock to prevent duplicate scans
     lock_acquired = await acquire_zone_lock(zone_id)
     if not lock_acquired:
         logger.info(f"[{scan_id}] Zone {zone_name} is already being scanned. Skipping.")
-        return
+        return None
 
     band_paths = None
     try:
         # --- Step 1: Fetch satellite bands ---
         geojson_coords = zone["geojson"]["coordinates"]
-        band_paths = await fetch_sentinel_bands(geojson_coords, zone_id)
+        band_paths = await fetch_sentinel_bands(
+            geojson_coords, zone_id, start_date=start_date, end_date=end_date
+        )
 
         if band_paths is None:
             logger.warning(f"[{scan_id}] No satellite data available for zone {zone_name}")
@@ -67,7 +80,7 @@ async def scan_single_zone(zone_id: str) -> None:
                 {"_id": oid},
                 {"$set": {"last_scanned_at": datetime.utcnow()}},
             )
-            return
+            return None
 
         # --- Step 2: Compute NDVI + EVI ---
         geojson_polygon = zone["geojson"]
@@ -80,11 +93,14 @@ async def scan_single_zone(zone_id: str) -> None:
 
         if ndvi_result is None:
             logger.error(f"[{scan_id}] NDVI computation failed for zone {zone_name}")
-            return
+            return None
+
+        # Use end_date as snapshot timestamp if provided, otherwise utcnow
+        snapshot_time = end_date if end_date else datetime.utcnow()
 
         # --- Step 3: Store snapshot in MongoDB ---
         snapshot_doc = {
-            "timestamp": datetime.utcnow(),
+            "timestamp": snapshot_time,
             "zone_id": zone_id,
             "ndvi_mean": ndvi_result["ndvi_mean"],
             "ndvi_min": ndvi_result["ndvi_min"],
@@ -97,7 +113,7 @@ async def scan_single_zone(zone_id: str) -> None:
         }
         await db["ndvi_snapshots"].insert_one(snapshot_doc)
         logger.info(
-            f"[{scan_id}] Snapshot stored for zone {zone_name}: "
+            f"[{scan_id}] Snapshot stored for zone {zone_name} on {snapshot_time}: "
             f"NDVI={ndvi_result['ndvi_mean']:.3f}"
         )
 
@@ -108,8 +124,9 @@ async def scan_single_zone(zone_id: str) -> None:
         )
 
         # --- Step 4: Fetch previous snapshot for change detection ---
+        # Fetch previous snapshot that is older than this one's timestamp
         prev_snapshot = await db["ndvi_snapshots"].find_one(
-            {"zone_id": zone_id, "scan_id": {"$ne": scan_id}},
+            {"zone_id": zone_id, "timestamp": {"$lt": snapshot_time}},
             sort=[("timestamp", -1)],
         )
 
@@ -142,16 +159,18 @@ async def scan_single_zone(zone_id: str) -> None:
             "zone_name": zone_name,
             "scan_id": scan_id,
             "ndvi_mean": ndvi_result["ndvi_mean"],
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": snapshot_time.isoformat(),
         })
 
         logger.info(f"[{scan_id}] Scan complete for zone: {zone_name}")
+        return ndvi_result
 
     except Exception as e:
         logger.error(
             f"[{scan_id}] Scan pipeline error for zone {zone_name}: {e}",
             exc_info=True,
         )
+        return None
     finally:
         # Release the distributed lock
         await release_zone_lock(zone_id)
@@ -165,6 +184,40 @@ async def scan_single_zone(zone_id: str) -> None:
                     break
                 except Exception:
                     pass
+
+
+async def seed_historical_zone_data(zone_id: str) -> None:
+    """
+    On zone creation, automatically fetch and process the last 2 historical satellite passes:
+    Pass 1: Date range from 30 days ago to 15 days ago (creates baseline snapshot).
+    Pass 2: Date range from 15 days ago to today (creates second snapshot and runs change detection/alerts).
+    """
+    from datetime import timedelta
+    logger.info(f"Seeding historical baseline data for newly created zone: {zone_id}")
+    now = datetime.utcnow()
+
+    # Pass 1: Baseline (30 days ago to 15 days ago)
+    t1_end = now - timedelta(days=15)
+    t1_start = now - timedelta(days=30)
+    logger.info(f"Historical Pass 1: searching from {t1_start.date()} to {t1_end.date()}")
+    await scan_single_zone_for_date_range(
+        zone_id=zone_id,
+        start_date=t1_start,
+        end_date=t1_end,
+        scan_id="hist_base"
+    )
+
+    # Pass 2: Detection pass (15 days ago to today)
+    t2_end = now
+    t2_start = now - timedelta(days=15)
+    logger.info(f"Historical Pass 2: searching from {t2_start.date()} to {t2_end.date()}")
+    await scan_single_zone_for_date_range(
+        zone_id=zone_id,
+        start_date=t2_start,
+        end_date=t2_end,
+        scan_id="hist_curr"
+    )
+    logger.info(f"Finished seeding historical baseline data for zone: {zone_id}")
 
 
 async def run_all_zone_scans() -> None:

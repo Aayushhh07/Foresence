@@ -11,9 +11,28 @@ from botocore.exceptions import ClientError
 
 from app.core.config import settings
 
+import os
+from pathlib import Path
+
 logger = logging.getLogger(__name__)
 
 _s3_client = None
+
+# Local static directory fallback path (backend/static)
+STATIC_DIR = Path(__file__).resolve().parents[2] / "static"
+
+
+def _is_r2_enabled() -> bool:
+    """Check if Cloudflare R2 credentials are set and not default placeholders."""
+    key = settings.cloudflare_r2_access_key.strip()
+    secret = settings.cloudflare_r2_secret_key.strip()
+    endpoint = settings.cloudflare_r2_endpoint.strip()
+
+    if not key or not secret or not endpoint:
+        return False
+    if any(placeholder in key.lower() for placeholder in ("demo", "your_r2")):
+        return False
+    return True
 
 
 def _get_s3_client():
@@ -41,8 +60,25 @@ async def upload_bytes_to_r2(
 ) -> str:
     """
     Upload bytes to Cloudflare R2 and return the public URL.
+    Falls back to storing local static files if R2 is not enabled.
     Key should be a path like 'ndvi/zone_id/scan_id.png'.
     """
+    if not _is_r2_enabled():
+        try:
+            dest_path = STATIC_DIR / key
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(dest_path, "wb") as f:
+                f.write(data)
+
+            # Construct backend URL serving static files (e.g. replace frontend port 5173 with backend port 8000)
+            backend_base_url = settings.frontend_url.replace(":5173", ":8000")
+            public_url = f"{backend_base_url.rstrip('/')}/static/{key}"
+            logger.info(f"Saved locally (R2 fallback): {key} ({len(data)} bytes) -> {public_url}")
+            return public_url
+        except Exception as e:
+            logger.error(f"Local storage write failed for key '{key}': {e}", exc_info=True)
+            raise
+
     try:
         client = _get_s3_client()
         client.put_object(
@@ -62,7 +98,17 @@ async def upload_bytes_to_r2(
 
 
 async def delete_from_r2(key: str) -> None:
-    """Delete an object from R2."""
+    """Delete an object from R2 or local storage."""
+    if not _is_r2_enabled():
+        try:
+            dest_path = STATIC_DIR / key
+            if dest_path.exists():
+                dest_path.unlink()
+                logger.info(f"Deleted locally: {key}")
+        except Exception as e:
+            logger.error(f"Local delete failed for key '{key}': {e}")
+        return
+
     try:
         client = _get_s3_client()
         client.delete_object(
@@ -75,7 +121,11 @@ async def delete_from_r2(key: str) -> None:
 
 
 def get_presigned_url(key: str, expiry_seconds: int = 3600) -> Optional[str]:
-    """Generate a presigned URL for private bucket access."""
+    """Generate a presigned URL or local URL."""
+    if not _is_r2_enabled():
+        backend_base_url = settings.frontend_url.replace(":5173", ":8000")
+        return f"{backend_base_url.rstrip('/')}/static/{key}"
+
     try:
         client = _get_s3_client()
         url = client.generate_presigned_url(
@@ -90,3 +140,4 @@ def get_presigned_url(key: str, expiry_seconds: int = 3600) -> Optional[str]:
     except ClientError as e:
         logger.error(f"Presigned URL generation failed: {e}")
         return None
+

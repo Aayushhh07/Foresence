@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import useZones from '../../hooks/useZones';
-import useAppStore from '../../store/appStore';
-import ZoneDrawer from './ZoneDrawer';
 import ZonePopup from './ZonePopup';
+import { healthApi } from '../../services/api';
+import { toast } from 'react-toastify';
 
 // Fix Leaflet default icon
 delete L.Icon.Default.prototype._getIconUrl;
@@ -20,51 +20,6 @@ const STATUS_COLORS = {
   warning: '#d97706',
   critical: '#dc2626',
 };
-
-// ─── Drawing Control Component ──────────────────────────────────────
-function DrawControl({ onPolygonDrawn }) {
-  const map = useMap();
-  const drawnItemsRef = useRef(new L.FeatureGroup());
-
-  useEffect(() => {
-    map.addLayer(drawnItemsRef.current);
-
-    // Lazy-load leaflet-draw
-    import('leaflet-draw').then(() => {
-      const drawControl = new L.Control.Draw({
-        position: 'topright',
-        draw: {
-          polygon: {
-            allowIntersection: false,
-            shapeOptions: { color: '#16a34a', fillOpacity: 0.15, weight: 2 },
-            showArea: true,
-          },
-          polyline: false,
-          rectangle: false,
-          circle: false,
-          marker: false,
-          circlemarker: false,
-        },
-        edit: { featureGroup: drawnItemsRef.current, edit: false, remove: false },
-      });
-      map.addControl(drawControl);
-
-      map.on(L.Draw.Event.CREATED, (e) => {
-        const layer = e.layer;
-        drawnItemsRef.current.clearLayers();
-        drawnItemsRef.current.addLayer(layer);
-        const geojson = layer.toGeoJSON().geometry;
-        onPolygonDrawn(geojson);
-      });
-    });
-
-    return () => {
-      map.removeLayer(drawnItemsRef.current);
-    };
-  }, [map, onPolygonDrawn]);
-
-  return null;
-}
 
 // ─── Zone Layer Component ───────────────────────────────────────────
 function ZoneLayers({ zones, onZoneClick }) {
@@ -97,34 +52,80 @@ function ZoneLayers({ zones, onZoneClick }) {
   });
 }
 
+function MapAutoFit({ zones }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!zones.length) return;
+
+    const bounds = L.latLngBounds([]);
+
+    zones.forEach((zone) => {
+      const ring = zone?.geojson?.coordinates?.[0];
+      if (!Array.isArray(ring)) return;
+      ring.forEach(([lng, lat]) => {
+        if (typeof lat === 'number' && typeof lng === 'number') {
+          bounds.extend([lat, lng]);
+        }
+      });
+    });
+
+    if (bounds.isValid()) {
+      map.fitBounds(bounds, { padding: [24, 24], maxZoom: 12 });
+    }
+  }, [map, zones]);
+
+  return null;
+}
+
 // ─── Map Dashboard ──────────────────────────────────────────────────
 export default function MapDashboard() {
   const { zones, zonesLoading, fetchZones } = useZones();
-  const [drawnGeojson, setDrawnGeojson] = useState(null);
   const [selectedZone, setSelectedZone] = useState(null);
-  const [popupPosition, setPopupPosition] = useState({ top: 64, left: 64 });
+  const [connectivityLoading, setConnectivityLoading] = useState(false);
+  const [connectivityResult, setConnectivityResult] = useState(null);
 
   useEffect(() => {
     fetchZones();
   }, [fetchZones]);
 
-  const handlePolygonDrawn = (geojson) => {
-    setDrawnGeojson(geojson);
-  };
-
   const handleZoneClick = (zone) => {
     setSelectedZone(zone);
-  };
-
-  const handleZoneCreated = (zone) => {
-    setDrawnGeojson(null);
-    fetchZones();
   };
 
   const totalZones = zones.length;
   const criticalCount = zones.filter((z) => z.status === 'critical').length;
   const warningCount = zones.filter((z) => z.status === 'warning').length;
   const healthyCount = zones.filter((z) => z.status === 'healthy').length;
+
+  const handleConnectivityCheck = async () => {
+    if (!zones.length) {
+      toast.warn('No zones available to test connectivity.');
+      return;
+    }
+
+    setConnectivityLoading(true);
+    try {
+      const zone = zones[0];
+      const res = await healthApi.satelliteCheck({
+        geojson: zone.geojson,
+        lookback_days: 30,
+        require_copernicus_auth: true,
+      });
+      const result = res.data?.data || null;
+      setConnectivityResult(result);
+      if (result?.has_recent_scene) {
+        toast.success('Satellite connectivity is healthy.');
+      } else {
+        toast.warn('Connectivity works, but no recent scene found.');
+      }
+    } catch (err) {
+      setConnectivityResult(null);
+      toast.error(err.message || 'Satellite connectivity check failed');
+    } finally {
+      setConnectivityLoading(false);
+    }
+  };
 
   return (
     <div className="flex flex-col h-full relative">
@@ -153,12 +154,24 @@ export default function MapDashboard() {
           </div>
         )}
         <div className="ml-auto flex items-center gap-2 text-xs text-slate-500">
-          <svg className="w-3.5 h-3.5 text-forest-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-          </svg>
-          Use the polygon tool (top-right) to draw a new monitoring zone
+          <button
+            type="button"
+            className="btn-secondary"
+            onClick={handleConnectivityCheck}
+            disabled={connectivityLoading || zonesLoading || zones.length === 0}
+          >
+            {connectivityLoading ? 'Checking Satellite…' : 'Check Satellite Connectivity'}
+          </button>
         </div>
       </div>
+
+      {connectivityResult && (
+        <div className="px-4 py-2 bg-slate-100 border-b border-slate-200 text-xs text-slate-700">
+          STAC: {connectivityResult.stac?.reachable ? 'reachable' : 'unreachable'} | Copernicus:{' '}
+          {connectivityResult.copernicus?.auth_ok ? 'auth ok' : 'auth failed'} | Recent scene:{' '}
+          {connectivityResult.has_recent_scene ? 'yes' : 'no'}
+        </div>
+      )}
 
       {/* Map */}
       <div className="flex-1 relative">
@@ -173,8 +186,8 @@ export default function MapDashboard() {
         )}
 
         <MapContainer
-          center={[20.5937, 78.9629]}
-          zoom={5}
+          center={[0, 0]}
+          zoom={2}
           className="w-full h-full"
           style={{ zIndex: 0 }}
         >
@@ -185,7 +198,7 @@ export default function MapDashboard() {
           />
 
           <ZoneLayers zones={zones} onZoneClick={handleZoneClick} />
-          <DrawControl onPolygonDrawn={handlePolygonDrawn} />
+          <MapAutoFit zones={zones} />
         </MapContainer>
 
         {/* Zone popup (custom, not Leaflet popup) */}
@@ -203,21 +216,12 @@ export default function MapDashboard() {
           <div className="absolute bottom-8 left-1/2 -translate-x-1/2 z-[500] pointer-events-none">
             <div className="bg-white/95 rounded-xl shadow-lg px-5 py-4 text-center border border-slate-200">
               <div className="text-2xl mb-1">🌳</div>
-              <div className="font-semibold text-slate-800 text-sm">No zones yet</div>
-              <div className="text-slate-500 text-xs mt-1">Use the polygon tool to draw your first monitoring zone</div>
+              <div className="font-semibold text-slate-800 text-sm">No zones available</div>
+              <div className="text-slate-500 text-xs mt-1">Zones are provided by backend configuration</div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Zone creation modal */}
-      {drawnGeojson && (
-        <ZoneDrawer
-          geojson={drawnGeojson}
-          onClose={() => setDrawnGeojson(null)}
-          onSuccess={handleZoneCreated}
-        />
-      )}
     </div>
   );
 }

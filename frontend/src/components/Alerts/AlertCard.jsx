@@ -43,7 +43,7 @@ function ImageModal({ src, onClose }) {
   );
 }
 
-export default function AlertCard({ alert }) {
+export default function AlertCard({ alert, onStatusChanged }) {
   const { updateAlertStatus } = useAppStore();
   const [updating, setUpdating] = useState(false);
   const [imageModalSrc, setImageModalSrc] = useState(null);
@@ -59,6 +59,7 @@ export default function AlertCard({ alert }) {
       await alertsApi.updateStatus(alert._id, newStatus);
       updateAlertStatus(alert._id, newStatus);
       toast.success(`Alert ${newStatus}`);
+      onStatusChanged?.();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -77,7 +78,7 @@ export default function AlertCard({ alert }) {
               <div className="font-bold text-slate-900 text-sm">{alert.zone_name}</div>
               <div className="text-slate-500 text-xs mt-0.5">
                 {alert.detected_at
-                  ? format(new Date(alert.detected_at), 'MMM d, yyyy · HH:mm UTC')
+                  ? format(new Date(alert.detected_at), "MMM d, yyyy · HH:mm 'UTC'")
                   : 'Unknown time'
                 }
               </div>

@@ -1,13 +1,20 @@
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List
-import os
+import json
 
 
 class Settings(BaseSettings):
+    # Runtime mode
+    app_mode: str = "prod"
+    enable_startup_seed: bool = False
+    enable_demo_routes: bool = False
+    enable_predefined_zones: bool = True
+    predefined_zones_json: str = "[]"
+
     # Copernicus credentials (optional for demo mode)
-    copernicus_username: str = "demo"
-    copernicus_password: str = "demo"
+    copernicus_username: str = ""
+    copernicus_password: str = ""
 
     # MongoDB (required — must be a real connection string)
     mongodb_uri: str = ""
@@ -36,9 +43,25 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173"
     frontend_url: str = "http://localhost:5173"
 
+    @field_validator("app_mode")
+    @classmethod
+    def validate_app_mode(cls, v: str) -> str:
+        value = v.strip().lower()
+        if value not in {"prod", "demo"}:
+            raise ValueError("app_mode must be either 'prod' or 'demo'")
+        return value
+
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @property
+    def predefined_zones(self) -> List[dict]:
+        try:
+            data = json.loads(self.predefined_zones_json or "[]")
+            return data if isinstance(data, list) else []
+        except Exception:
+            return []
 
     class Config:
         env_file = ".env"

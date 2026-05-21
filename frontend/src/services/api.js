@@ -30,6 +30,7 @@ export const zonesApi = {
 // ─── Alerts ──────────────────────────────────────────────────────────
 export const alertsApi = {
   list: (params = {}) => api.get('/api/alerts', { params }),
+  summary: () => api.get('/api/alerts/summary'),
   get: (id) => api.get(`/api/alerts/${id}`),
   updateStatus: (id, status, notes = '') =>
     api.put(`/api/alerts/${id}/status`, { status, notes }),
@@ -44,6 +45,7 @@ export const snapshotsApi = {
 // ─── Health ──────────────────────────────────────────────────────────
 export const healthApi = {
   check: () => api.get('/api/health'),
+  satelliteCheck: (data) => api.post('/api/health/satellite-check', data),
 };
 
 export default api;

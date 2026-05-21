@@ -48,7 +48,9 @@ const NAV = [
 
 export default function Sidebar() {
   const { sidebarCollapsed, setSidebarCollapsed, alerts, zones } = useAppStore();
-  const newAlertsCount = alerts.filter((a) => a.status === 'new').length;
+  const safeAlerts = Array.isArray(alerts) ? alerts : [];
+  const safeZones = Array.isArray(zones) ? zones : [];
+  const newAlertsCount = safeAlerts.filter((a) => a?.status === 'new').length;
 
   return (
     <aside
@@ -117,7 +119,7 @@ export default function Sidebar() {
             <div className="text-slate-500 text-xs mb-2 uppercase tracking-wide font-semibold">Quick Stats</div>
             <div className="flex justify-between text-xs">
               <span className="text-slate-400">Zones</span>
-              <span className="text-white font-semibold">{zones.length}</span>
+              <span className="text-white font-semibold">{safeZones.length}</span>
             </div>
             <div className="flex justify-between text-xs mt-1">
               <span className="text-slate-400">New Alerts</span>

@@ -7,6 +7,7 @@ from bson import ObjectId
 from datetime import datetime
 
 from fastapi import APIRouter, HTTPException, Query
+from pymongo import ReturnDocument
 
 from app.core.database import get_db
 from app.models.alert import AlertStatusUpdate
@@ -57,6 +58,29 @@ async def list_alerts(
     }
 
 
+@router.get("/summary", response_model=dict)
+async def alerts_summary():
+    """
+    Count alerts by workflow status plus total (for inbox UI tabs).
+    Declared before /{alert_id} so ``summary`` is not parsed as an ObjectId.
+    """
+    db = get_db()
+    counts = {"new": 0, "acknowledged": 0, "resolved": 0, "total": 0}
+    pipeline = [{"$group": {"_id": "$status", "count": {"$sum": 1}}}]
+    cursor = db["alerts"].aggregate(pipeline)
+    async for row in cursor:
+        status_key = row.get("_id") or ""
+        cnt = int(row.get("count", 0))
+        counts["total"] += cnt
+        if status_key in counts:
+            counts[status_key] = cnt
+    return {
+        "success": True,
+        "data": counts,
+        "message": "Alert counts by status",
+    }
+
+
 @router.get("/{alert_id}", response_model=dict)
 async def get_alert(alert_id: str):
     """Get a single alert by ID."""
@@ -89,7 +113,7 @@ async def update_alert_status(alert_id: str, update: AlertStatusUpdate):
     result = await db["alerts"].find_one_and_update(
         {"_id": oid},
         {"$set": updates},
-        return_document=True,
+        return_document=ReturnDocument.AFTER,
     )
     if not result:
         raise HTTPException(status_code=404, detail="Alert not found")

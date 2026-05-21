@@ -8,6 +8,7 @@ import Header from './components/Layout/Header';
 import StatusBar from './components/Layout/StatusBar';
 import MapDashboard from './components/Map/MapDashboard';
 import AlertCenter from './components/Alerts/AlertCenter';
+import RouteErrorBoundary from './components/Layout/RouteErrorBoundary';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -54,14 +55,16 @@ function AppContent() {
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
         <Header />
 
-        <main className="flex-1 overflow-hidden">
-          <Routes>
-            <Route path="/" element={<MapDashboard />} />
-            <Route path="/alerts" element={<AlertCenter />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+        <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+          <RouteErrorBoundary>
+            <Routes>
+              <Route path="/" element={<MapDashboard />} />
+              <Route path="/alerts" element={<AlertCenter />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </RouteErrorBoundary>
         </main>
 
         <StatusBar />

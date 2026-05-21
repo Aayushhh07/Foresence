@@ -14,7 +14,7 @@ from datetime import datetime
 import rasterio
 from rasterio.mask import mask as rasterio_mask
 from rasterio.enums import Resampling
-from rasterio.warp import reproject, Resampling as WarpResampling
+from rasterio.warp import reproject, Resampling as WarpResampling, transform_geom
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
@@ -47,13 +47,16 @@ def _clip_band_to_polygon(
     """
     try:
         with rasterio.open(band_path) as src:
-            shapes = [geojson_polygon]
+            # Reproject WGS84 GeoJSON geometry (EPSG:4326) to the raster's CRS (e.g. UTM)
+            geom_projected = transform_geom("EPSG:4326", src.crs, geojson_polygon)
+            shapes = [geom_projected]
+            nodata_val = src.nodata if src.nodata is not None else 0
             try:
                 clipped, transform = rasterio_mask(
                     src,
                     shapes,
                     crop=True,
-                    nodata=np.nan,
+                    nodata=nodata_val,
                     all_touched=True,
                     filled=True,
                 )
@@ -63,6 +66,9 @@ def _clip_band_to_polygon(
                 return None, None
 
             data = clipped[0].astype(np.float32)
+            if nodata_val is not None:
+                data = np.where(data == nodata_val, np.nan, data)
+
             profile = src.profile.copy()
             profile.update(
                 height=clipped.shape[1],

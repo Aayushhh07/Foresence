@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import useZones from '../../hooks/useZones';
 import { toast } from 'react-toastify';
+import { healthApi } from '../../services/api';
 
 export default function ZoneDrawer({ geojson, onClose, onSuccess }) {
   const { createZone } = useZones();
   const [loading, setLoading] = useState(false);
+  const [checkingCoverage, setCheckingCoverage] = useState(false);
+  const [coverageResult, setCoverageResult] = useState(null);
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -41,6 +44,29 @@ export default function ZoneDrawer({ geojson, onClose, onSuccess }) {
       toast.error(err.message || 'Failed to create zone');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSatelliteCheck = async () => {
+    setCheckingCoverage(true);
+    try {
+      const res = await healthApi.satelliteCheck({
+        geojson,
+        lookback_days: 30,
+        require_copernicus_auth: true,
+      });
+      const result = res.data?.data || null;
+      setCoverageResult(result);
+      if (result?.has_recent_scene) {
+        toast.success('Satellite coverage available for this zone.');
+      } else {
+        toast.warn('No recent scene found in lookback window.');
+      }
+    } catch (err) {
+      setCoverageResult(null);
+      toast.error(err.message || 'Satellite check failed');
+    } finally {
+      setCheckingCoverage(false);
     }
   };
 
@@ -146,6 +172,39 @@ export default function ZoneDrawer({ geojson, onClose, onSuccess }) {
           <div className="bg-slate-50 rounded-lg p-3 text-xs text-slate-500">
             <span className="font-semibold text-slate-700">Polygon: </span>
             {geojson?.coordinates?.[0]?.length} vertices drawn
+          </div>
+
+          {/* Satellite coverage preflight */}
+          <div className="rounded-lg border border-slate-200 p-3 bg-white">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-800">Satellite Coverage Check</p>
+                <p className="text-xs text-slate-500">Verify recent Sentinel scenes before creating zone.</p>
+              </div>
+              <button
+                type="button"
+                onClick={handleSatelliteCheck}
+                className="btn-secondary"
+                disabled={checkingCoverage || loading}
+              >
+                {checkingCoverage ? 'Checking…' : 'Check Coverage'}
+              </button>
+            </div>
+
+            {coverageResult && (
+              <div className="mt-3 text-xs space-y-1">
+                <p className={coverageResult.has_recent_scene ? 'text-green-700' : 'text-amber-700'}>
+                  {coverageResult.has_recent_scene ? 'Recent scene available' : 'No recent scene found'}
+                </p>
+                <p className="text-slate-600">
+                  STAC: {coverageResult.stac?.reachable ? 'reachable' : 'unreachable'}
+                  {coverageResult.stac?.latest_scene?.datetime ? ` | latest: ${coverageResult.stac.latest_scene.datetime}` : ''}
+                </p>
+                <p className="text-slate-600">
+                  Copernicus auth: {coverageResult.copernicus?.auth_ok ? 'ok' : 'failed'}
+                </p>
+              </div>
+            )}
           </div>
 
           {/* Actions */}

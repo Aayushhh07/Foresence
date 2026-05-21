@@ -1,374 +1,436 @@
-# 🌿 Foresense — Illegal Deforestation Detection Platform
+<p align="center">
+  <img src="https://img.shields.io/badge/Platform-Illegal%20Deforestation%20Monitoring-2d6a4f?style=for-the-badge" alt="Platform" />
+</p>
 
-> **Real-time forest monitoring using Sentinel-2 satellite imagery, NDVI analysis, and AI-powered change detection.**
+<h1 align="center">Foresense</h1>
 
-[![FastAPI](https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi)](https://fastapi.tiangolo.com)
-[![React](https://img.shields.io/badge/Frontend-React%2018-61DAFB?style=flat-square&logo=react)](https://reactjs.org)
-[![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?style=flat-square&logo=mongodb)](https://mongodb.com)
-[![Redis](https://img.shields.io/badge/Cache-Redis-DC382D?style=flat-square&logo=redis)](https://redis.io)
-[![Sentinel-2](https://img.shields.io/badge/Satellite-Sentinel--2-0099CC?style=flat-square)](https://sentinel.esa.int)
+<p align="center">
+  <strong>Satellite-powered forest monitoring with NDVI change detection, real-time alerts, and an operations dashboard.</strong>
+</p>
 
----
+<p align="center">
+  <a href="#features">Features</a> ·
+  <a href="#architecture">Architecture</a> ·
+  <a href="#api-reference">API</a> ·
+  <a href="#quick-start">Quick Start</a> ·
+  <a href="#configuration">Configuration</a> ·
+  <a href="#deployment">Deployment</a>
+</p>
 
-## 📖 Table of Contents
-
-1. [What is Foresense?](#1-what-is-foresense)
-2. [How It Works — The Big Picture](#2-how-it-works--the-big-picture)
-3. [Tech Stack](#3-tech-stack)
-4. [Project Structure](#4-project-structure)
-5. [Architecture Deep Dive](#5-architecture-deep-dive)
-6. [API Reference](#6-api-reference)
-7. [Frontend Pages & Components](#7-frontend-pages--components)
-8. [Database Schema](#8-database-schema)
-9. [Setup Guide (Step by Step)](#9-setup-guide-step-by-step)
-10. [Running the App](#10-running-the-app)
-11. [User Manual — Every Feature Explained](#11-user-manual--every-feature-explained)
-12. [Demo Mode](#12-demo-mode)
-13. [What Is Working vs What Needs External Setup](#13-what-is-working-vs-what-needs-external-setup)
-14. [How to Add New Features](#14-how-to-add-new-features)
-15. [Deployment Guide](#15-deployment-guide)
-16. [Troubleshooting](#16-troubleshooting)
-17. [Glossary](#17-glossary)
+<p align="center">
+  <img src="https://img.shields.io/badge/Backend-FastAPI-009688?style=flat-square&logo=fastapi" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/Frontend-React%2018-61DAFB?style=flat-square&logo=react" alt="React" />
+  <img src="https://img.shields.io/badge/Database-MongoDB-47A248?style=flat-square&logo=mongodb" alt="MongoDB" />
+  <img src="https://img.shields.io/badge/Cache-Redis-DC382D?style=flat-square&logo=redis" alt="Redis" />
+  <img src="https://img.shields.io/badge/Satellite-Sentinel--2-0099CC?style=flat-square" alt="Sentinel-2" />
+  <img src="https://img.shields.io/badge/License-MIT-blue?style=flat-square" alt="MIT" />
+</p>
 
 ---
 
-## 1. What is Foresense?
+## Table of Contents
 
-Foresense is a **web application that monitors forests from space**. It uses satellite images taken by the European Space Agency's **Sentinel-2** satellite to detect when trees are being cut down — even in remote areas without human observers.
-
-### The Problem It Solves
-
-Illegal deforestation is one of the biggest contributors to climate change. Millions of hectares of forest disappear every year, but traditional monitoring (ground patrols, aerial surveys) is expensive and slow. By the time humans find out, it's too late.
-
-### How Foresense Helps
-
-- **Draws a polygon on a map** around any forest area you want to protect
-- **Automatically downloads satellite images** of that area every 12 hours
-- **Calculates NDVI** (Normalized Difference Vegetation Index) — a scientific measure of how green/healthy the vegetation is
-- **Compares images over time** — if NDVI drops significantly, deforestation is detected
-- **Sends instant alerts** with severity levels, affected area in hectares, and a visual change map
-- **Tracks trends** with interactive charts showing vegetation health over time
-
----
-
-## 2. How It Works — The Big Picture
-
-```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         FORESENSE SYSTEM                            │
-│                                                                     │
-│  User draws a zone    Scheduler runs     Satellite data downloaded  │
-│  on the map      →    every 12 hours  →  from Copernicus/STAC       │
-│       ↓                                          ↓                  │
-│  Zone saved to        NDVI computed              Rasterio clips      │
-│  MongoDB          ←   and stored        ←        the image to zone  │
-│       ↓                                          ↓                  │
-│  Change detection:    Alert created if    WebSocket pushes alert    │
-│  vs previous NDVI  →  drop > threshold →  to browser in real-time  │
-│       ↓                                          ↓                  │
-│  Dashboard shows      Email sent to       Toast notification shows  │
-│  updated health   ←   configured emails ← in the user's browser    │
-└─────────────────────────────────────────────────────────────────────┘
-```
-
-### Step-By-Step Pipeline
-
-1. **User creates a monitoring zone** — draws a polygon on the Leaflet map
-2. **APScheduler triggers a scan** — runs every 12 hours (configurable)
-3. **Sentinel service** — searches Copernicus Data Space for recent Sentinel-2 L2A products over that polygon with < 30% cloud cover
-4. **Fallback to Element84 STAC** — if Copernicus doesn't have imagery, tries public STAC catalog
-5. **Band extraction** — extracts Band 2 (Blue), Band 4 (Red), Band 8 (NIR) from the satellite ZIP
-6. **Rasterio clipping** — clips the large satellite tile to the exact zone polygon boundary
-7. **NDVI computation**: `(NIR - Red) / (NIR + Red)` — values range from -1 to +1; healthy forest is 0.6–0.9
-8. **EVI computation**: Enhanced Vegetation Index (more accurate in dense canopy)
-9. **Snapshot storage** — saves NDVI/EVI stats + image URL to MongoDB time-series collection
-10. **Change detection** — compares current NDVI array against previous snapshot
-11. **If NDVI drop > threshold AND confidence > threshold** → creates an alert
-12. **Alert saved to MongoDB** — with severity (low/medium/high/critical), affected area in hectares, change map image
-13. **WebSocket broadcast** — all connected browsers receive the alert instantly
-14. **Toast notification** appears in the user's browser
-15. **Email notification** sent via SendGrid to configured recipients
+- [Overview](#overview)
+- [How It Works](#how-it-works)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Scan Pipeline](#scan-pipeline)
+- [API Flow](#api-flow)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [API Reference](#api-reference)
+- [WebSocket Events](#websocket-events)
+- [Database Schema](#database-schema)
+- [Frontend Application](#frontend-application)
+- [Detection Logic](#detection-logic)
+- [Configuration](#configuration)
+- [Quick Start](#quick-start)
+- [Demo Mode](#demo-mode)
+- [Deployment](#deployment)
+- [Troubleshooting](#troubleshooting)
+- [Roadmap](#roadmap)
+- [Contributing](#contributing)
+- [License](#license)
 
 ---
 
-## 3. Tech Stack
+## Overview
 
-### Backend
+**Foresense** (repository folder: `Foresence`) is a full-stack web platform for monitoring forest areas using **Sentinel-2** satellite imagery. Rangers and analysts draw **monitoring zones** on an interactive map; the backend automatically ingests imagery, computes vegetation indices, compares snapshots over time, and raises **deforestation alerts** when thresholds are exceeded.
 
-| Technology | What it does | Why it was chosen |
-|---|---|---|
-| **FastAPI** | Python web framework, REST API + WebSocket | Async-native, auto docs, fast |
-| **Uvicorn** | ASGI server that runs FastAPI | Async, production-grade |
-| **Motor** | Async MongoDB driver for Python | Non-blocking DB operations |
-| **APScheduler** | Task scheduler — runs zone scans | Background jobs without Celery |
-| **Rasterio** | Reads and processes satellite GeoTIFF/JP2 files | Industry standard for raster data |
-| **NumPy** | Array math for NDVI computation | Fast pixel-level operations |
-| **Matplotlib** | Renders change map PNGs | Simple image generation |
-| **Shapely** | Geometry operations (polygon clipping) | Spatial math |
-| **PyProj** | Coordinate system transformations | WGS84 ↔ UTM projections |
-| **httpx** | Async HTTP client (downloads satellite data) | Streaming large files |
-| **pystac-client** | Queries STAC catalogs (Element84 fallback) | Standard satellite data API |
-| **boto3** | AWS S3 compatible — uploads to Cloudflare R2 | Image storage |
-| **SendGrid** | Email notifications for alerts | Reliable email delivery |
-| **Redis** | Distributed zone scan locks + caching | Prevents duplicate scans |
-| **pydantic-settings** | Loads and validates `.env` configuration | Type-safe config |
+| Aspect | Description |
+|--------|-------------|
+| **Problem** | Illegal deforestation is hard to detect in remote areas with ground patrols alone. |
+| **Approach** | Periodic satellite scans + **NDVI/EVI** time-series + rule-based change detection. |
+| **Delivery** | REST API, WebSocket push, email (SendGrid), optional webhooks, React dashboard. |
 
-### Frontend
-
-| Technology | What it does |
-|---|---|
-| **React 18** | UI component framework |
-| **Vite** | Fast dev server and bundler |
-| **TailwindCSS** | Utility-first CSS framework |
-| **React Leaflet** | Interactive map with satellite tiles |
-| **Leaflet Draw** | Draw polygons on the map |
-| **Recharts** | NDVI time-series charts |
-| **Zustand** | Simple global state management |
-| **Axios** | HTTP client for API calls |
-| **React Router v6** | Client-side routing (SPA) |
-| **React Toastify** | Toast notifications for new alerts |
-
-### External Services
-
-| Service | Purpose | Free Tier? |
-|---|---|---|
-| **MongoDB Atlas** | Cloud database (zones, alerts, snapshots) | ✅ Free M0 (512MB) |
-| **Upstash Redis** | Zone scan locks + caching | ✅ Free (10k ops/day) |
-| **Copernicus Data Space** | Sentinel-2 satellite imagery | ✅ Free (registration) |
-| **Cloudflare R2** | Store NDVI/change map images | ✅ Free (10GB/month) |
-| **SendGrid** | Email alerts | ✅ Free (100 emails/day) |
+> **Transparency:** Detection is **remote-sensing analytics** (thresholds and vegetation indices), not a trained deep-learning model. There is no user image upload flow—the system pulls imagery from public satellite catalogs.
 
 ---
 
-## 4. Project Structure
+## How It Works
 
-```
-Foresense/
-│
-├── README.md                          ← You are here
-├── .gitignore
-│
-├── backend/                           ← Python FastAPI server
-│   ├── .env                           ← Environment variables (secrets go here)
-│   ├── .env.example                   ← Template showing what vars are needed
-│   ├── requirements.txt               ← Python package dependencies
-│   ├── Dockerfile                     ← Container definition for deployment
-│   ├── render.yaml                    ← Render.com deployment config
-│   │
-│   ├── venv/                          ← Python virtual environment (auto-created)
-│   │
-│   └── app/                           ← Main application package
-│       ├── __init__.py
-│       ├── main.py                    ← FastAPI app, startup/shutdown, router registration
-│       │
-│       ├── core/                      ← Shared infrastructure
-│       │   ├── config.py              ← Reads .env, exposes settings object
-│       │   ├── database.py            ← MongoDB connection + index creation
-│       │   └── redis_client.py        ← Redis connection + zone locking
-│       │
-│       ├── api/                       ← HTTP endpoints
-│       │   ├── websocket.py           ← WebSocket /ws/alerts endpoint
-│       │   └── routes/
-│       │       ├── zones.py           ← GET/POST/PUT/DELETE /api/zones
-│       │       ├── alerts.py          ← GET/PUT /api/alerts
-│       │       ├── snapshots.py       ← GET /api/snapshots (NDVI time-series)
-│       │       ├── health.py          ← GET /api/health (system status)
-│       │       └── demo.py            ← POST /api/demo/seed (populate demo data)
-│       │
-│       ├── models/                    ← Pydantic data models (request/response shapes)
-│       │   ├── zone.py                ← ZoneCreate, ZoneUpdate, ZoneResponse
-│       │   ├── alert.py               ← AlertCreate, AlertStatusUpdate
-│       │   └── snapshot.py            ← Snapshot model
-│       │
-│       ├── services/                  ← Business logic
-│       │   ├── sentinel_service.py    ← Downloads Sentinel-2 satellite bands
-│       │   ├── ndvi_service.py        ← Computes NDVI/EVI from bands using rasterio
-│       │   ├── change_detection.py    ← Compares NDVIs, computes affected area
-│       │   ├── alert_service.py       ← Creates alerts, updates health, sends emails
-│       │   ├── storage_service.py     ← Uploads images to Cloudflare R2
-│       │   └── email_service.py       ← SendGrid email templates
-│       │
-│       └── scheduler/                 ← Background job system
-│           ├── scheduler.py           ← APScheduler setup and lifecycle
-│           └── jobs.py                ← scan_single_zone(), run_all_zone_scans()
-│
-└── frontend/                          ← React application
-    ├── .env                           ← Frontend environment (API URLs)
-    ├── package.json                   ← Node.js dependencies
-    ├── vite.config.js                 ← Vite build config
-    ├── tailwind.config.js             ← TailwindCSS config
-    ├── index.html                     ← HTML entry point
-    │
-    ├── public/                        ← Static assets
-    │
-    └── src/
-        ├── main.jsx                   ← React app entry (mounts to #root)
-        ├── App.jsx                    ← Root component: router, initial data load
-        ├── App.css                    ← Global styles
-        ├── index.css                  ← Tailwind imports + CSS variables
-        │
-        ├── services/
-        │   └── api.js                 ← Axios client, all API functions grouped by resource
-        │
-        ├── store/
-        │   └── appStore.js            ← Zustand global state (zones, alerts, health, WS)
-        │
-        ├── hooks/
-        │   ├── useZones.js            ← Zone CRUD operations using the API
-        │   └── useWebSocket.js        ← WebSocket connection with auto-reconnect
-        │
-        ├── components/
-        │   ├── Layout/
-        │   │   ├── Sidebar.jsx        ← Navigation sidebar (Map/Alerts/Analytics/Settings)
-        │   │   ├── Header.jsx         ← Page title, stats pills, Seed Demo button
-        │   │   └── StatusBar.jsx      ← Bottom bar: WS status, last scan time
-        │   │
-        │   ├── Map/
-        │   │   ├── MapDashboard.jsx   ← Main Leaflet map, zone polygons, color coding
-        │   │   ├── ZoneDrawer.jsx     ← Polygon drawing tool, zone creation form
-        │   │   └── ZonePopup.jsx      ← Popup when clicking a zone on the map
-        │   │
-        │   ├── Alerts/
-        │   │   ├── AlertCenter.jsx    ← Alert list with filters (severity, zone, status)
-        │   │   └── AlertCard.jsx      ← Individual alert display card
-        │   │
-        │   ├── Analytics/
-        │   │   ├── NDVIChart.jsx      ← Line chart of NDVI over time per zone
-        │   │   └── ChangeAreaChart.jsx← Bar chart of affected area per alert
-        │   │
-        │   └── Settings/
-        │       ├── ZoneSettings.jsx   ← Edit zone thresholds, emails, webhooks
-        │       └── NotificationSettings.jsx ← Email/webhook preferences
-        │
-        └── pages/
-            ├── AnalyticsPage.jsx      ← Full analytics view (charts + zone selector)
-            └── SettingsPage.jsx       ← Full settings view
+1. Define a **GeoJSON polygon** around a forest area (draw on map or use predefined zones).
+2. Backend **downloads Sentinel-2** bands (Blue, Red, NIR) via **Element84 STAC** (primary) or **Copernicus Data Space** (fallback).
+3. **Rasterio** clips rasters to the zone; **NDVI** and **EVI** are computed per pixel.
+4. Each scan stores a **snapshot** in MongoDB (timeseries).
+5. **Change detection** compares the current snapshot to the previous one.
+6. If **confidence** and **NDVI drop** exceed zone thresholds → **alert** (DB + WebSocket + email + webhook).
+7. Operators review alerts on the **Alert Center**, acknowledge, and resolve incidents.
+
+```mermaid
+flowchart LR
+  A[Draw zone on map] --> B[Zone saved to MongoDB]
+  B --> C[Scheduler / manual scan]
+  C --> D[Sentinel-2 bands]
+  D --> E[NDVI / EVI + snapshot]
+  E --> F{Change vs previous?}
+  F -->|Yes| G[Alert + notify]
+  F -->|No| H[Update health score]
+  G --> I[Dashboard + WebSocket]
+  H --> I
 ```
 
 ---
 
-## 5. Architecture Deep Dive
+## Features
 
-### How the Backend is Organized
+### Monitoring & geospatial
 
-Think of it in layers:
+- Interactive **Leaflet** map with zone polygons colored by health (green / yellow / red).
+- **Polygon drawing** (Leaflet Draw) to create monitoring zones.
+- **Geodesic area** calculation (hectares) per zone.
+- **Satellite pre-check** API before zone creation (`/api/health/satellite-check`).
+- **Manual scan** per zone (`POST /api/zones/{id}/scan`).
+- **Scheduled scans** every 12 hours (configurable) for all active zones.
 
-```
-Request comes in
-      ↓
-  FastAPI Router (api/routes/*.py)    ← Validates input, calls services
-      ↓
-  Service Layer (services/*.py)        ← Business logic, database calls
-      ↓
-  Data Layer (core/database.py)        ← MongoDB queries via Motor
-      ↓
-  Response goes back to client
-```
+### Detection & alerts
 
-### The Satellite Scan Pipeline (Most Complex Part)
+- **NDVI** and **EVI** computation from Sentinel-2 L2A bands.
+- **Change maps** (loss / gain visualization) stored on Cloudflare R2 or local `/static`.
+- **Severity levels:** low, medium, high, critical (from NDVI delta magnitude).
+- **Per-zone thresholds:** NDVI drop and confidence.
+- **Zone health score** (0–100) and status (`healthy` / `warning` / `critical`).
 
-```
-APScheduler fires every 12 hours
-          ↓
-  jobs.py → run_all_zone_scans()
-          ↓
-  For each active zone in MongoDB:
-          ↓
-  1. Acquire Redis lock (prevents same zone being scanned twice)
-          ↓
-  2. sentinel_service.fetch_sentinel_bands()
-     ├── Try: Copernicus OAuth → search OData API → download ZIP → extract B02/B04/B08
-     └── Fallback: Element84 STAC → search → download COG TIFs
-          ↓
-  3. ndvi_service.compute_ndvi_for_zone()
-     ├── rasterio opens band files
-     ├── Clips bands to zone polygon (CRS transforms via pyproj)
-     ├── Computes NDVI = (B08 - B04) / (B08 + B04)
-     ├── Computes EVI = 2.5 * (B08 - B04) / (B08 + 6*B04 - 7.5*B02 + 1)
-     ├── Detects clouds (NDVI outliers = cloud pixels)
-     └── Uploads colorized NDVI PNG to Cloudflare R2
-          ↓
-  4. Store snapshot in MongoDB ndvi_snapshots collection
-          ↓
-  5. change_detection.detect_change()
-     ├── Loads previous snapshot from DB
-     ├── Computes pixel-level NDVI delta
-     ├── Counts pixels below threshold (= affected pixels)
-     ├── Converts affected pixels to hectares using pixel CRS info
-     ├── Computes confidence score (adjusted for cloud cover)
-     └── Renders change map PNG (red=loss, green=gain) → uploads to R2
-          ↓
-  6. alert_service.create_alert_if_triggered()
-     ├── If NDVI delta < -threshold AND confidence >= threshold:
-     │   ├── Determine severity (low/medium/high/critical)
-     │   ├── Insert alert into MongoDB
-     │   ├── Update zone health_score and status
-     │   ├── Broadcast via WebSocket to all browsers
-     │   ├── Send email via SendGrid
-     │   └── POST to webhook URL (if configured)
-     └── Release Redis lock
-```
+### Notifications & real-time
 
-### WebSocket Real-Time Flow
+- **WebSocket** (`/ws/alerts`) for live alerts, health updates, and scan completion.
+- **SendGrid** HTML email alerts to configured addresses.
+- **Webhook POST** per zone (optional integration URL).
 
-```
-Browser connects to ws://localhost:8000/ws/alerts
-          ↓
-Server adds browser to _connected_clients set
-          ↓
-Server sends: { "type": "connected", "message": "..." }
-          ↓
-Browser starts 30-second ping/pong keepalive
-          ↓
-When alert created → broadcast() sends to ALL connected browsers
-          ↓
-Browser receives: { "type": "alert", "severity": "high", ... }
-          ↓
-Zustand store updated → React re-renders
-          ↓
-Toast notification pops up
-```
+### Operations UI
 
-### Frontend State Management
+- **Map dashboard** — zones, popups, scan now.
+- **Alert Center** — filter by severity, status, zone; acknowledge / resolve.
+- **Analytics** — NDVI trend line chart and change-area bar chart (Recharts).
+- **Settings** — edit thresholds, emails, webhooks, activate/deactivate zones.
 
-```
-Zustand Store (appStore.js)
-│
-├── zones[]          ← All forest zones from API
-├── alerts[]         ← Recent alerts from API
-├── snapshots[]      ← NDVI time-series data
-├── systemHealth{}   ← DB/Redis/Scheduler status
-├── wsConnected      ← WebSocket connection state
-└── sidebarCollapsed ← UI state
+### Developer & ops
 
-Components read from store → User actions call API → Store updates → UI re-renders
-```
+- OpenAPI docs at `/docs` and `/redoc`.
+- **Demo seed** endpoint for testing without satellite credentials.
+- **Health endpoint** — MongoDB, Redis, scheduler status.
+- **Docker** + **Render** blueprint for backend deployment.
 
 ---
 
-## 6. API Reference
+## Architecture
 
-All API responses follow this standard format:
+### System context
+
+```mermaid
+flowchart TB
+  subgraph Client["Browser (React + Vite)"]
+    UI[Dashboard UI]
+    WSClient[WebSocket Client]
+  end
+
+  subgraph API["FastAPI Backend"]
+    REST[REST /api/*]
+    WSS[WebSocket /ws/alerts]
+    SCH[APScheduler]
+    PIPE[Scan Pipeline]
+  end
+
+  subgraph Persistence["Data Layer"]
+    MONGO[(MongoDB)]
+    REDIS[(Redis / memory locks)]
+    R2[(R2 or /static)]
+  end
+
+  subgraph External["External Services"]
+    STAC[Element84 STAC]
+    COP[Copernicus CDSE]
+    SG[SendGrid]
+  end
+
+  UI --> REST
+  WSClient --> WSS
+  REST --> MONGO
+  SCH --> PIPE
+  PIPE --> STAC
+  PIPE --> COP
+  PIPE --> MONGO
+  PIPE --> R2
+  PIPE --> WSS
+  PIPE --> REDIS
+  PIPE --> SG
+```
+
+### Backend layers
+
+```mermaid
+flowchart TB
+  REQ[HTTP / WebSocket Request]
+  ROUTE[api/routes/*.py]
+  SVC[services/*.py]
+  CORE[core/database · redis · config]
+  DB[(MongoDB)]
+
+  REQ --> ROUTE
+  ROUTE --> SVC
+  SVC --> CORE
+  CORE --> DB
+  SVC --> DB
+```
+
+| Layer | Responsibility |
+|-------|----------------|
+| **Routes** | Validation (Pydantic), HTTP/WebSocket handlers, standard `{ success, data, message }` envelope |
+| **Services** | Satellite fetch, NDVI, change detection, alerts, storage, email |
+| **Scheduler** | `jobs.py` — orchestrates full scan per zone |
+| **Core** | Config, Motor DB client, Redis locks |
+
+---
+
+## Scan Pipeline
+
+The core processing path runs on schedule, on manual trigger, or during historical zone seeding.
+
+```mermaid
+sequenceDiagram
+  participant S as Scheduler / API
+  participant J as jobs.py
+  participant L as Redis Lock
+  participant Sat as sentinel_service
+  participant ND as ndvi_service
+  participant CD as change_detection
+  participant A as alert_service
+  participant DB as MongoDB
+  participant WS as WebSocket
+
+  S->>J: scan_single_zone(zone_id)
+  J->>L: acquire_zone_lock
+  J->>Sat: fetch_sentinel_bands (STAC → Copernicus)
+  Sat-->>J: B02, B04, B08 paths
+  J->>ND: compute_ndvi_for_zone
+  ND-->>J: NDVI/EVI stats + PNG URL
+  J->>DB: insert ndvi_snapshots
+  J->>CD: detect_change vs previous
+  CD-->>J: delta, confidence, change map
+  alt thresholds met
+    J->>A: create_alert_if_triggered
+    A->>DB: insert alert
+    A->>WS: broadcast alert
+    A->>A: SendGrid + webhook
+  end
+  J->>WS: scan_complete
+  J->>L: release_zone_lock
+```
+
+### Historical baseline (new zones)
+
+When a zone is created, a **two-pass historical seed** runs in the background:
+
+| Pass | Date window | Purpose |
+|------|-------------|---------|
+| 1 | 30 → 15 days ago | Baseline snapshot |
+| 2 | 15 days ago → now | Comparison snapshot + possible first alert |
+
+### Satellite data sources
+
+| Priority | Source | Notes |
+|----------|--------|-------|
+| **Primary** | Element84 STAC | Public catalog; windowed COG downloads; no credentials |
+| **Fallback** | Copernicus Data Space | OAuth + OData; full product ZIP; requires `COPERNICUS_*` credentials |
+
+---
+
+## API Flow
+
+```mermaid
+flowchart TB
+  subgraph Zones
+    Z1[POST /api/zones] --> Z2[Background historical seed]
+    Z3[POST /api/zones/id/scan] --> Z4[scan_single_zone]
+  end
+
+  subgraph Alerts
+    A1[GET /api/alerts] --> A2[Filter + paginate]
+    A3[PUT /api/alerts/id/status] --> A4[acknowledged / resolved]
+  end
+
+  subgraph Health
+    H1[GET /api/health] --> H2[DB + Redis + scheduler]
+    H3[POST /api/health/satellite-check] --> H4[STAC / Copernicus probe]
+  end
+
+  subgraph Realtime
+    W1[WS /ws/alerts] --> W2[broadcast on alert / health / scan]
+  end
+```
+
+All REST responses use this envelope:
+
 ```json
 {
   "success": true,
-  "data": { ... },
-  "message": "Human readable description"
+  "data": { },
+  "message": "Human-readable description"
 }
 ```
 
-### Zones API
+Errors return FastAPI `detail` (frontend Axios interceptor surfaces this).
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/zones` | List all forest zones |
-| `POST` | `/api/zones` | Create a new monitoring zone |
-| `GET` | `/api/zones/{id}` | Get a single zone by ID |
-| `PUT` | `/api/zones/{id}` | Update zone settings |
-| `DELETE` | `/api/zones/{id}` | Delete zone and its alerts |
-| `POST` | `/api/zones/{id}/scan` | Trigger immediate satellite scan |
+---
 
-**Create Zone — Request Body:**
+## Tech Stack
+
+### Backend
+
+| Technology | Role |
+|------------|------|
+| FastAPI | REST API + WebSocket |
+| Uvicorn | ASGI server |
+| Motor | Async MongoDB |
+| APScheduler | Interval + one-shot scan jobs |
+| Rasterio / NumPy / Shapely / PyProj | Geospatial processing |
+| pystac-client | STAC catalog queries |
+| httpx | Async satellite downloads |
+| boto3 | Cloudflare R2 (S3-compatible) |
+| SendGrid | Alert emails |
+| Redis (Upstash) | Distributed zone scan locks |
+
+### Frontend
+
+| Technology | Role |
+|------------|------|
+| React 18 | UI framework |
+| Vite 5 | Dev server and build |
+| TailwindCSS 3 | Styling |
+| React Leaflet + Leaflet Draw | Map and polygon tools |
+| Recharts | NDVI and change-area charts |
+| Zustand | Global state |
+| Axios | HTTP client |
+| React Router v6 | SPA routing |
+| React Toastify | Live alert toasts |
+
+### External services (free tiers available)
+
+| Service | Purpose |
+|---------|---------|
+| MongoDB Atlas | Zones, alerts, NDVI snapshots |
+| Upstash Redis | Scan locks (optional; memory fallback in dev) |
+| Copernicus Data Space | Sentinel-2 fallback downloads |
+| Cloudflare R2 | NDVI and change-map image hosting |
+| SendGrid | Email notifications |
+
+---
+
+## Project Structure
+
+```
+Foresence/
+├── README.md
+├── FORESENCE_DEEP_DIVE.md          # Extended technical notes
+├── .gitignore
+│
+├── backend/
+│   ├── .env.example                # Copy to .env (never commit .env)
+│   ├── requirements.txt
+│   ├── Dockerfile
+│   ├── render.yaml
+│   ├── static/                     # Local image fallback (ndvi/, changes/)
+│   └── app/
+│       ├── main.py                 # FastAPI app, lifespan, routers
+│       ├── core/
+│       │   ├── config.py           # Environment settings
+│       │   ├── database.py         # MongoDB + indexes + timeseries
+│       │   └── redis_client.py     # Locks + cache
+│       ├── api/
+│       │   ├── websocket.py        # /ws/alerts
+│       │   └── routes/
+│       │       ├── zones.py
+│       │       ├── alerts.py
+│       │       ├── snapshots.py
+│       │       ├── health.py
+│       │       └── demo.py         # Enabled when demo mode / flag set
+│       ├── models/
+│       │   ├── zone.py
+│       │   ├── alert.py
+│       │   └── snapshot.py
+│       ├── services/
+│       │   ├── sentinel_service.py # STAC + Copernicus
+│       │   ├── ndvi_service.py
+│       │   ├── change_detection.py
+│       │   ├── alert_service.py
+│       │   ├── storage_service.py
+│       │   └── email_service.py
+│       └── scheduler/
+│           ├── scheduler.py
+│           └── jobs.py             # scan_single_zone, run_all_zone_scans
+│
+└── frontend/
+    ├── .env.example
+    ├── package.json
+    ├── vite.config.js              # Proxies /api and /ws to :8000
+    └── src/
+        ├── main.jsx
+        ├── App.jsx                 # Routes + initial data load
+        ├── services/api.js         # Axios API clients
+        ├── store/appStore.js       # Zustand state
+        ├── hooks/
+        │   ├── useZones.js
+        │   └── useWebSocket.js
+        ├── components/
+        │   ├── Layout/             # Sidebar, Header, StatusBar
+        │   ├── Map/                # MapDashboard, ZoneDrawer, ZonePopup
+        │   ├── Alerts/             # AlertCenter, AlertCard
+        │   ├── Analytics/          # NDVIChart, ChangeAreaChart
+        │   └── Settings/           # ZoneSettings, NotificationSettings
+        └── pages/
+            ├── AnalyticsPage.jsx
+            └── SettingsPage.jsx
+```
+
+**Backend:** 22 Python modules in `app/`. **Frontend:** 25 source files under `src/`.
+
+---
+
+## API Reference
+
+Interactive documentation: **`http://localhost:8000/docs`**
+
+### Root
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/` | API metadata (`name`, `version`) |
+| `GET` | `/static/{path}` | Local NDVI/change images when R2 is disabled |
+
+### Zones — `/api/zones`
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/zones` | List all zones |
+| `POST` | `/api/zones` | Create zone + start historical baseline scan |
+| `GET` | `/api/zones/{id}` | Get one zone |
+| `PUT` | `/api/zones/{id}` | Update settings |
+| `DELETE` | `/api/zones/{id}` | Delete zone and related alerts |
+| `POST` | `/api/zones/{id}/scan` | Trigger immediate scan |
+
+**Create zone — request body:**
+
 ```json
 {
   "name": "Western Ghats Reserve",
@@ -380,146 +442,94 @@ All API responses follow this standard format:
   "ndvi_drop_threshold": 0.15,
   "confidence_threshold": 0.70,
   "alert_emails": ["ranger@forest.gov"],
-  "webhook_url": "https://your-system.com/webhook"
+  "webhook_url": "https://example.com/webhook"
 }
 ```
 
-### Alerts API
+| Field | Range | Meaning |
+|-------|-------|---------|
+| `ndvi_drop_threshold` | 0.05 – 0.40 | Minimum NDVI decrease to trigger alert |
+| `confidence_threshold` | 0.10 – 1.00 | Minimum confidence score (reduces false positives) |
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/alerts` | List alerts (filterable) |
-| `GET` | `/api/alerts/{id}` | Get single alert |
-| `PUT` | `/api/alerts/{id}/status` | Mark as acknowledged/resolved |
+### Alerts — `/api/alerts`
 
-**List Alerts — Query Parameters:**
-```
-?zone_id=abc123        Filter by zone
-?severity=critical     Filter by severity (low/medium/high/critical)
-?status=new            Filter by status (new/acknowledged/resolved)
-?limit=50              Max results (default 50, max 200)
-?skip=0                Pagination offset
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/alerts` | List alerts (filterable, paginated) |
+| `GET` | `/api/alerts/summary` | Counts by status |
+| `GET` | `/api/alerts/{id}` | Single alert |
+| `PUT` | `/api/alerts/{id}/status` | Update to `acknowledged` or `resolved` |
 
-### Snapshots API
+**Query parameters:** `zone_id`, `severity`, `status`, `limit` (max 200), `skip`
 
-| Method | Endpoint | Description |
-|---|---|---|
+### Snapshots — `/api/snapshots`
+
+| Method | Path | Description |
+|--------|------|-------------|
 | `GET` | `/api/snapshots` | List NDVI snapshots |
-| `GET` | `/api/snapshots/latest/{zone_id}` | Get latest snapshot for a zone |
+| `GET` | `/api/snapshots/latest/{zone_id}` | Latest snapshot for zone |
 
-**List Snapshots — Query Parameters:**
-```
-?zone_id=abc123        Filter by zone (required for meaningful results)
-?start_date=2026-01-01 ISO date filter
-?end_date=2026-04-01   ISO date filter
-?limit=90              Max results (default 90)
-```
+**Query parameters:** `zone_id`, `start_date`, `end_date`, `limit`
 
-### System API
+### Health — `/api/health`
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/api/health` | System health (DB, Redis, Scheduler) |
-| `GET` | `/` | Root info endpoint |
-| `POST` | `/api/demo/seed` | Populate database with demo data |
-| `DELETE` | `/api/demo/clear` | Clear all data from database |
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/api/health` | Database, Redis, scheduler, `last_scan_at` |
+| `POST` | `/api/health/satellite-check` | Verify STAC/Copernicus coverage for a polygon |
 
-### WebSocket
+### Demo — `/api/demo` *(when `ENABLE_DEMO_ROUTES=true` or `APP_MODE=demo`)*
 
-| Endpoint | Description |
-|---|---|
-| `ws://localhost:8000/ws/alerts` | Real-time alert stream |
-
-**Message Types Received:**
-```json
-{ "type": "connected", "message": "Connected to Foresence real-time alerts" }
-{ "type": "alert", "alert_id": "...", "zone_name": "...", "severity": "high", "confidence": 0.87 }
-{ "type": "health_update", "zone_id": "...", "health_score": 61, "status": "warning" }
-{ "type": "scan_complete", "zone_id": "...", "zone_name": "...", "ndvi_mean": 0.654 }
-{ "type": "pong" }
-```
-
-**Interactive API Documentation:**
-```
-http://localhost:8000/docs      ← Swagger UI (try all endpoints here)
-http://localhost:8000/redoc     ← ReDoc documentation
-```
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/demo/seed` | Insert demo zones, snapshots, alerts |
+| `DELETE` | `/api/demo/clear` | Remove demo data |
 
 ---
 
-## 7. Frontend Pages & Components
+## WebSocket Events
 
-### Page 1: Map Dashboard (`/`)
+**Endpoint:** `ws://localhost:8000/ws/alerts` (production: use `wss://` and `VITE_WS_URL`)
 
-**What you see:** A full-screen interactive map (OpenStreetMap) with colored polygon overlays for each monitored forest zone.
+```mermaid
+sequenceDiagram
+  participant B as Browser
+  participant S as FastAPI
 
-**Zone Colors:**
-- 🟢 Green — Healthy (health score > 70)
-- 🟡 Yellow — Warning (health score 40–70)
-- 🔴 Red — Critical (health score < 40)
+  B->>S: Connect /ws/alerts
+  S-->>B: type: connected
+  loop Keepalive
+    B->>S: type: ping
+    S-->>B: type: pong
+  end
+  Note over S: On alert / health / scan
+  S-->>B: type: alert | health_update | scan_complete
+```
 
-**How to interact:**
-- Click any zone polygon → popup shows zone stats, last scan time, NDVI value, manual scan button
-- Click the polygon drawing tool (top-right diamond icons) → draw a new zone
-- After drawing, a form appears to name the zone and set thresholds
-- Click "Scan Now" in the popup → triggers an immediate satellite scan
+| `type` | When | Key fields |
+|--------|------|------------|
+| `connected` | On connect | `message` |
+| `alert` | New deforestation alert | `alert_id`, `zone_name`, `severity`, `confidence`, `change_area_ha` |
+| `health_update` | Zone health changed | `zone_id`, `health_score`, `status` |
+| `scan_complete` | Scan finished | `zone_id`, `zone_name`, `ndvi_mean`, `scan_id` |
+| `pong` | Response to `ping` | — |
 
-### Page 2: Alert Center (`/alerts`)
-
-**What you see:** A list of all deforestation detection events, newest first.
-
-**Features:**
-- Filter by severity (Critical/High/Medium/Low)
-- Filter by status (New/Acknowledged/Resolved)
-- Filter by specific zone
-- Click "Acknowledge" → changes alert status, removes from "new" count
-- Click "Resolve" → marks as handled
-- Each card shows: severity badge, zone name, NDVI before/after, affected area in hectares, confidence percentage, detection timestamp
-
-### Page 3: Analytics (`/analytics`)
-
-**What you see:** Time-series charts of vegetation health over time.
-
-**Charts:**
-- **NDVI Trend** — Line chart showing NDVI mean over the past 60 days per zone
-- **Change Area** — Bar chart of affected area (hectares) per alert event
-
-**How to use:**
-- Select a zone from the dropdown → charts update to show that zone's data
-- Hover over chart points → tooltip shows exact values and dates
-
-### Page 4: Settings (`/settings`)
-
-**What you see:** Zone management and notification configuration.
-
-**Zone Settings:**
-- Edit zone name, description
-- Adjust NDVI drop threshold (0.05 – 0.40): lower = more sensitive to small changes
-- Adjust confidence threshold (0.10 – 1.00): higher = fewer false positives
-- Add/remove alert email addresses
-- Set webhook URL for integration with other systems
-- Toggle zone active/inactive (inactive zones are skipped in scans)
-- Delete zone (removes all associated alerts)
-
-**Notification Settings:**
-- Configure email addresses per zone
-- Webhook URL format and delivery format
+**Client → server:** `{"type":"ping"}`
 
 ---
 
-## 8. Database Schema
+## Database Schema
+
+**Database name:** `foresence` (configurable via `DB_NAME`)
 
 ### Collection: `zones`
+
 ```json
 {
   "_id": "ObjectId",
   "name": "Western Ghats Reserve",
-  "description": "Biodiversity hotspot...",
-  "geojson": {
-    "type": "Polygon",
-    "coordinates": [[[lon, lat], ...]]
-  },
+  "description": "string",
+  "geojson": { "type": "Polygon", "coordinates": [[[lon, lat], ...]] },
   "area_ha": 42500.0,
   "ndvi_drop_threshold": 0.15,
   "confidence_threshold": 0.70,
@@ -528,18 +538,19 @@ http://localhost:8000/redoc     ← ReDoc documentation
   "health_score": 61,
   "status": "warning",
   "active": true,
-  "created_at": "2026-01-01T00:00:00Z",
-  "last_scanned_at": "2026-04-23T10:00:00Z"
+  "created_at": "ISO-8601",
+  "last_scanned_at": "ISO-8601"
 }
 ```
 
 ### Collection: `alerts`
+
 ```json
 {
   "_id": "ObjectId",
-  "zone_id": "string (ObjectId reference)",
-  "zone_name": "Western Ghats Reserve",
-  "detected_at": "2026-04-22T08:00:00Z",
+  "zone_id": "string",
+  "zone_name": "string",
+  "detected_at": "ISO-8601",
   "ndvi_before": 0.72,
   "ndvi_after": 0.34,
   "ndvi_delta": -0.38,
@@ -548,619 +559,302 @@ http://localhost:8000/redoc     ← ReDoc documentation
   "change_area_ha": 1240.0,
   "confidence": 0.94,
   "severity": "critical",
-  "change_map_url": "https://r2.dev/changes/zone_id/scan_id.png",
+  "change_map_url": "https://...",
   "status": "new",
   "notified": true,
-  "notified_at": "2026-04-22T08:05:00Z",
+  "notified_at": "ISO-8601",
   "notes": ""
 }
 ```
 
-### Collection: `ndvi_snapshots` *(MongoDB Timeseries)*
+### Collection: `ndvi_snapshots` *(MongoDB timeseries)*
+
 ```json
 {
-  "timestamp": "2026-04-23T10:00:00Z",
-  "zone_id": "string (ObjectId reference)",
+  "timestamp": "ISO-8601",
+  "zone_id": "string",
   "ndvi_mean": 0.654,
   "ndvi_min": 0.421,
   "ndvi_max": 0.871,
   "evi_mean": 0.541,
   "cloud_cover_pct": 8.3,
-  "image_url": "https://r2.dev/ndvi/zone_id/scan_id.png",
+  "image_url": "https://...",
   "scan_id": "a3f2c1d8"
 }
 ```
 
-**Indexes created automatically on startup:**
-- `zones`: status, active, geojson (2dsphere), created_at
-- `alerts`: zone_id, detected_at, severity, status, confidence
-- `ndvi_snapshots`: (zone_id, timestamp) compound index
+---
+
+## Frontend Application
+
+### Routes
+
+| Path | Component | Purpose |
+|------|-----------|---------|
+| `/` | `MapDashboard` | Map, zones, draw tool, manual scan |
+| `/alerts` | `AlertCenter` | Alert inbox with filters |
+| `/analytics` | `AnalyticsPage` | NDVI trend + change-area charts |
+| `/settings` | `SettingsPage` | Zone and notification settings |
+
+### Zone map colors
+
+| Color | Health score | Status |
+|-------|--------------|--------|
+| Green | > 70 | `healthy` |
+| Yellow | 40 – 70 | `warning` |
+| Red | < 40 | `critical` |
+
+### App initialization
+
+On load: connect WebSocket → `fetchZones()` → load alerts → `healthApi.check()`.
 
 ---
 
-## 9. Setup Guide (Step by Step)
+## Detection Logic
 
-### Prerequisites
+### Vegetation indices
 
-You need these installed on your computer:
-- **Python 3.12** — [Download](https://python.org/downloads)
-- **Node.js 18+** — [Download](https://nodejs.org)
-- **Git** — [Download](https://git-scm.com)
+- **NDVI:** `(NIR − Red) / (NIR + Red)` — healthy forest typically **0.6 – 0.9**
+- **EVI:** `2.5 × (NIR − Red) / (NIR + 6×Red − 7.5×Blue + 1)` — better in dense canopy
+- **Cloud proxy:** pixels with blue reflectance > 0.3
 
-Check your versions:
-```powershell
-python --version    # Should show 3.12.x
-node --version      # Should show 18.x or higher
-git --version
+### Alert trigger
+
+An alert is created when **both** conditions hold:
+
+```
+confidence >= zone.confidence_threshold
+AND ndvi_delta <= -zone.ndvi_drop_threshold
 ```
 
----
+### Severity (from `ndvi_delta`)
 
-### Step 1: Get the Code
+| Severity | Condition |
+|----------|-----------|
+| `critical` | Δ ≤ −0.35 |
+| `high` | Δ ≤ −0.25 |
+| `medium` | Δ ≤ −0.15 |
+| `low` | otherwise |
 
-```powershell
-git clone https://github.com/yourname/foresense.git
-cd foresense
-```
+### Authentication
 
----
-
-### Step 2: Set Up External Services
-
-#### 2a. MongoDB Atlas (Free Database)
-
-1. Go to [cloud.mongodb.com](https://cloud.mongodb.com) → Sign up free
-2. Click **"Build a Database"** → Choose **M0 Free** → Any region → Create
-3. Go to **"Database Access"** → **"Add New Database User"**
-   - Username: `foresense`
-   - Password: Click "Autogenerate" → **Copy it**
-   - Role: **Atlas Admin**
-4. Go to **"Network Access"** → **"Add IP Address"** → **"Allow Access From Anywhere"**
-5. Go to **"Database"** → **"Connect"** → **"Drivers"** → Copy the URI
-   - It looks like: `mongodb+srv://foresense:<password>@cluster.xxxxx.mongodb.net/`
-   - Replace `<password>` with the password you copied
-
-#### 2b. Upstash Redis (Free Cache)
-
-1. Go to [upstash.com](https://upstash.com) → Sign up free
-2. Click **"Create Database"**
-   - Name: `foresense-redis`
-   - Type: Regional
-   - Region: Pick closest to you
-3. Click on the database → find **"Redis URL"**
-   - It looks like: `rediss://default:PASSWORD@host.upstash.io:6380`
-   - Copy the full URL (must start with `rediss://`)
-
-#### 2c. Optional Services (for full functionality)
-
-**Copernicus Data Space** (for real satellite data):
-1. Register at [dataspace.copernicus.eu](https://dataspace.copernicus.eu)
-2. Verify your email
-3. Your username = the email you registered with
-
-**Cloudflare R2** (for image storage):
-1. Create account at [cloudflare.com](https://cloudflare.com)
-2. Go to **R2** → Create Bucket named `foresence-images`
-3. Go to **Manage R2 API Tokens** → Create token with read/write access
-4. Note the Account ID from the URL (used in endpoint)
-5. Endpoint format: `https://<ACCOUNT_ID>.r2.cloudflarestorage.com`
-
-**SendGrid** (for email notifications):
-1. Create account at [sendgrid.com](https://sendgrid.com)
-2. Go to **Settings** → **API Keys** → Create API Key → Full Access
-3. Verify sender email in **Sender Authentication**
+**There is no end-user authentication** on REST or WebSocket in the current version. All API routes are open; secure deployments should add auth (see [Roadmap](#roadmap)).
 
 ---
 
-### Step 3: Configure the Backend
+## Configuration
 
-```powershell
-cd backend
-```
+### Backend (`backend/.env`)
 
-Open `.env` and fill in your values:
+Copy from `backend/.env.example`:
 
 ```env
-# ── REQUIRED (real values needed) ──────────────────────────────────────
-MONGODB_URI=mongodb+srv://foresense:YourPassword@cluster.xxxxx.mongodb.net/
+# Required
+MONGODB_URI=mongodb+srv://user:password@cluster.mongodb.net/
 DB_NAME=foresence
 
-UPSTASH_REDIS_URL=rediss://default:YourPassword@your-name.upstash.io:6380
+# Recommended
+UPSTASH_REDIS_URL=rediss://default:password@host.upstash.io:6380
 
-# ── OPTIONAL (leave as "demo" to use demo mode) ─────────────────────────
-COPERNICUS_USERNAME=your_username@email.com
-COPERNICUS_PASSWORD=your_copernicus_password
+# Satellite (fallback; STAC works without credentials)
+COPERNICUS_USERNAME=
+COPERNICUS_PASSWORD=
 
-CLOUDFLARE_R2_ACCESS_KEY=your_r2_access_key
-CLOUDFLARE_R2_SECRET_KEY=your_r2_secret_key
+# Image storage (optional — uses /static if not configured)
+CLOUDFLARE_R2_ACCESS_KEY=
+CLOUDFLARE_R2_SECRET_KEY=
 CLOUDFLARE_R2_BUCKET_NAME=foresence-images
-CLOUDFLARE_R2_ENDPOINT=https://your-account-id.r2.cloudflarestorage.com
-CLOUDFLARE_R2_PUBLIC_URL=https://pub-xxxx.r2.dev
+CLOUDFLARE_R2_ENDPOINT=
+CLOUDFLARE_R2_PUBLIC_URL=
 
-SENDGRID_API_KEY=SG.your_sendgrid_key
-ALERT_FROM_EMAIL=alerts@yourdomain.com
+# Email (optional)
+SENDGRID_API_KEY=
+ALERT_FROM_EMAIL=
 
-# ── SETTINGS ──────────────────────────────────────────────────────────
+# Behavior
 SCAN_INTERVAL_HOURS=12
 NDVI_DROP_THRESHOLD=0.15
 CONFIDENCE_THRESHOLD=0.70
 CORS_ORIGINS=http://localhost:5173
 FRONTEND_URL=http://localhost:5173
+
+# Optional flags
+APP_MODE=prod
+ENABLE_DEMO_ROUTES=false
+ENABLE_PREDEFINED_ZONES=true
+PREDEFINED_ZONES_JSON=[]
 ```
 
----
+### Frontend (`frontend/.env`)
 
-### Step 4: Install Backend Dependencies
-
-```powershell
-# Create a virtual environment (isolated Python sandbox)
-python -m venv venv
-
-# Activate it (Windows PowerShell)
-.\venv\Scripts\Activate.ps1
-
-# Install all packages
-pip install -r requirements.txt
-```
-
-> **Note:** `rasterio` installation can be slow (large geospatial library). Please wait.
-
----
-
-### Step 5: Install Frontend Dependencies
-
-```powershell
-cd ..\frontend
-npm install
-```
-
----
-
-## 10. Running the App
-
-You need **two terminals open simultaneously** — one for backend, one for frontend.
-
-### Terminal 1 — Backend
-
-```powershell
-cd C:\Users\jannu\Desktop\Foresense\backend
-.\venv\Scripts\Activate.ps1
-uvicorn app.main:app --reload --port 8000
-```
-
-**Expected output:**
-```
-INFO  Foresence backend starting up...
-INFO  Connected to MongoDB successfully.
-INFO  MongoDB indexes created successfully.
-INFO  Connected to Redis successfully.
-INFO  Scheduler started. Zone scans every 12 hours.
-INFO  Foresence backend ready.
-INFO  Uvicorn running on http://127.0.0.1:8000
-```
-
-### Terminal 2 — Frontend
-
-```powershell
-cd C:\Users\jannu\Desktop\Foresense\frontend
-npm run dev
-```
-
-**Expected output:**
-```
-  VITE v5.x.x  ready in 500ms
-  ➜  Local:   http://localhost:5173/
-```
-
-### Access the App
-
-| URL | What's there |
-|---|---|
-| `http://localhost:5173` | The main web app |
-| `http://localhost:8000/docs` | Interactive API documentation |
-| `http://localhost:8000/api/health` | System health check |
-
----
-
-## 11. User Manual — Every Feature Explained
-
-### Creating Your First Monitoring Zone
-
-1. Open `http://localhost:5173`
-2. You'll see the **Map Dashboard** with an India-centered map
-3. Look for the **diamond-shaped icons** in the top-right corner of the map
-4. Click the **first diamond** (polygon tool)
-5. Click on the map to place polygon vertices around the forest area you want to monitor
-6. Double-click to finish drawing
-7. A form panel appears on the left — fill in:
-   - **Zone Name** — e.g., "Western Ghats Reserve"
-   - **Description** — optional notes
-   - **NDVI Drop Threshold** — `0.15` means "alert if NDVI drops by 15% or more"
-   - **Confidence Threshold** — `0.70` means "only alert if 70% confident it's real change"
-   - **Alert Emails** — add email addresses to notify (optional)
-8. Click **"Create Zone"**
-9. The zone appears as a green polygon on the map
-
-### Understanding Zone Colors
-
-| Color | Health Score | Meaning |
-|---|---|---|
-| 🟢 Green | > 70 | Forest is healthy, no significant changes |
-| 🟡 Yellow | 40–70 | Some vegetation loss detected, monitoring closely |
-| 🔴 Red | < 40 | Severe deforestation detected, alerts active |
-
-### Triggering a Satellite Scan
-
-**Automatic:** Runs every 12 hours for all active zones.
-
-**Manual:**
-1. Click on any zone polygon on the map
-2. A popup appears with zone details
-3. Click **"Scan Now"** button
-4. The backend queues an immediate scan
-5. Check the browser console or terminal for scan progress
-6. Results appear within a few minutes (depending on satellite data availability)
-
-> **In demo mode:** Scans won't actually download satellite data since Copernicus credentials needed.
-
-### Reading an Alert
-
-Alerts appear in the **Alert Center** (`/alerts` page). Each card shows:
-
-- **Severity badge** (CRITICAL/HIGH/MEDIUM/LOW) — based on size of NDVI drop
-  - LOW: NDVI dropped 0.15–0.25
-  - MEDIUM: NDVI dropped 0.25–0.35
-  - HIGH: NDVI dropped 0.35–0.50
-  - CRITICAL: NDVI dropped > 0.50
-
-- **Zone name** — which forest was affected
-
-- **NDVI Before → After** — e.g., 0.72 → 0.34
-  - This means vegetation went from 72% healthy to 34% healthy
-
-- **Affected area** — how many hectares are impacted
-
-- **Confidence** — how sure the system is (%)
-
-- **Detected at** — when the change was detected
-
-- **Status** — New / Acknowledged / Resolved
-
-### Acknowledging an Alert
-
-1. Go to `/alerts`
-2. Find an alert with status "New"
-3. Click **"Acknowledge"**
-4. Status changes to "Acknowledged" → removed from "New Alerts" counter
-5. This means a human has seen it and is investigating
-
-### Resolving an Alert
-
-1. Click **"Resolve"** on any acknowledged alert
-2. Optionally add notes about what action was taken
-3. Status changes to "Resolved" → archive only
-
-### Reading the Analytics Charts
-
-1. Go to `/analytics`
-2. Select a zone from the dropdown at the top
-3. **NDVI Trend Chart** — the line shows how green the forest was over time
-   - Horizontal axis = dates (last 60 days)
-   - Vertical axis = NDVI value (0 = no vegetation, 1 = perfect vegetation)
-   - A dropping line = deforestation is occurring
-4. **Change Area Chart** — bars show how many hectares were affected in each alert event
-
-### Adjusting Sensitivity (Settings)
-
-If you're getting too many false positives:
-- Go to `/settings` → find your zone
-- **Increase NDVI Drop Threshold** (e.g., 0.15 → 0.20) — only alerts on bigger changes
-- **Increase Confidence Threshold** (e.g., 0.70 → 0.85) — only high-certainty alerts
-
-If you want to catch more subtle changes:
-- **Decrease NDVI Drop Threshold** (e.g., 0.15 → 0.10)
-- **Decrease Confidence Threshold** (e.g., 0.70 → 0.60) — more sensitive but more false positives
-
----
-
-## 12. Demo Mode
-
-For testing without satellite API keys, use the built-in demo seed system.
-
-### Using the Seed Button
-
-1. Start both backend and frontend
-2. In the app header, click **"🌱 Seed Demo Data"** button
-3. Wait 2–3 seconds
-4. The map populates with 3 realistic Indian forest zones:
-   - **Western Ghats Reserve** — 42,500 ha, Warning status
-   - **Sundarbans Mangrove Belt** — 98,000 ha, Critical status
-   - **Assam Tropical Forest** — 31,200 ha, Healthy status
-5. 90 NDVI snapshots (60 days × 3 zones) populate the analytics charts
-6. 8 alerts of various severities appear in the Alert Center
-
-### Using the API Directly
-
-```powershell
-# Seed demo data
-curl -X POST http://localhost:8000/api/demo/seed
-
-# Clear all data (full reset)
-curl -X DELETE http://localhost:8000/api/demo/clear
-```
-
-### Via Swagger UI
-
-1. Go to `http://localhost:8000/docs`
-2. Find `POST /api/demo/seed`
-3. Click **"Try it out"** → **"Execute"**
-4. Refresh the frontend
-
----
-
-## 13. What Is Working vs What Needs External Setup
-
-### ✅ Works Right Now (No External Keys Needed)
-
-| Feature | Status |
-|---|---|
-| Backend server starts | ✅ Working |
-| MongoDB connection | ✅ Working (with Atlas) |
-| Redis connection | ✅ Working (with Upstash) or memory fallback |
-| Zone CRUD (create/read/update/delete) | ✅ Working |
-| Demo data seeding | ✅ Working |
-| Map with zone polygons | ✅ Working |
-| Alert Center with filters | ✅ Working |
-| Alert status updates | ✅ Working |
-| Analytics charts | ✅ Working |
-| WebSocket real-time connection | ✅ Working |
-| Settings page | ✅ Working |
-| Health check endpoint | ✅ Working |
-| API documentation (Swagger) | ✅ Working |
-
-### ⚠️ Needs Real Credentials to Work
-
-| Feature | What's Needed |
-|---|---|
-| Real satellite scans | Copernicus account (free) |
-| NDVI image thumbnails in alerts | Cloudflare R2 (free) |
-| Email notifications | SendGrid account (free) + verified sender |
-| Zone scan lock (distributed) | Upstash Redis (works fine with memory fallback in dev) |
-
-### 🚧 Future Enhancements (Not Yet Built)
-
-| Feature | Complexity | Value |
-|---|---|---|
-| User authentication (login/logout) | Medium | High — needed for production |
-| Report PDF export | Medium | High — for rangers |
-| Mobile app (React Native) | High | Medium |
-| Multi-satellite support (Landsat 8) | High | Medium |
-| AI classification (CNN model) | Very High | Very High |
-| Historical comparison (years) | Low | High |
-| Zone sharing between users | Medium | Medium |
-| SMS alerts (Twilio) | Low | High |
-| Offline map tiles | Medium | Medium |
-| Species-level forest typing | Very High | High |
-
----
-
-## 14. How to Add New Features
-
-### Adding a New API Endpoint
-
-1. **Create or open** a file in `backend/app/api/routes/`
-2. **Define the router and endpoint:**
-
-```python
-# backend/app/api/routes/reports.py
-from fastapi import APIRouter
-from app.core.database import get_db
-
-router = APIRouter(prefix="/api/reports", tags=["reports"])
-
-@router.get("/summary")
-async def get_summary():
-    db = get_db()
-    # your logic here
-    return {"success": True, "data": {}, "message": "Summary"}
-```
-
-3. **Register in `main.py`:**
-
-```python
-from app.api.routes import zones, alerts, snapshots, health, demo, reports
-# ...
-app.include_router(reports.router)
-```
-
-4. **Call from frontend in `services/api.js`:**
-
-```javascript
-export const reportsApi = {
-  summary: () => api.get('/api/reports/summary'),
-};
-```
-
-### Adding a New Frontend Page
-
-1. **Create the page component** in `frontend/src/pages/NewPage.jsx`
-2. **Add route in `App.jsx`:**
-
-```jsx
-<Route path="/newpage" element={<NewPage />} />
-```
-
-3. **Add navigation link in `Sidebar.jsx`** (follow existing pattern)
-
-### Adding a New Database Field to Zones
-
-1. **Update `models/zone.py`** — add field to `ZoneCreate` and `ZoneResponse`
-2. **Update the zone creation logic in `routes/zones.py`** to include the new field in `zone_doc`
-3. **Update the frontend form** in `ZoneDrawer.jsx` or `ZoneSettings.jsx`
-
-### Adding a New Alert Severity Level
-
-1. **Edit `services/alert_service.py`** — update `_determine_severity()` function
-2. **Edit frontend** `AlertCard.jsx` — add the new severity badge color
-
-### Adding a New Notification Channel (e.g., SMS)
-
-1. **Install the package:** `pip install twilio`
-2. **Add credentials to `config.py`** and `.env`
-3. **Create `services/sms_service.py`** following the `email_service.py` pattern
-4. **Call it from `alert_service.py`** after the email send block
-
----
-
-## 15. Deployment Guide
-
-### Backend — Render.com (Free Tier)
-
-A `render.yaml` file is already included. To deploy:
-
-1. Push code to GitHub
-2. Go to [render.com](https://render.com) → New → Blueprint
-3. Connect your GitHub repo
-4. Render reads `render.yaml` automatically
-5. Add your environment variables in Render dashboard
-6. Deploy
-
-**Important:** Render free tier spins down after 15 minutes of inactivity. Use a paid plan for always-on monitoring.
-
-### Frontend — Vercel (Free)
-
-1. Push frontend code to GitHub
-2. Go to [vercel.com](https://vercel.com) → New Project → Import repo
-3. Set root directory to `frontend`
-4. Add environment variable: `VITE_API_URL=https://your-render-app.onrender.com`
-5. Deploy
-
-### Docker (Self-hosted)
-
-```powershell
-# Build backend image
-docker build -t foresense-backend ./backend
-
-# Run container
-docker run -p 8000:8000 --env-file backend/.env foresense-backend
-```
-
----
-
-## 16. Troubleshooting
-
-### "ValueError: Redis URL must specify one of the following schemes"
-
-**Cause:** `UPSTASH_REDIS_URL` in `.env` is still a placeholder (not a real URL).
-
-**Fix:** Either:
-- Paste a real Upstash Redis URL (must start with `rediss://`)
-- The system now gracefully falls back to memory-only mode if URL is blank
-
----
-
-### "TypeError: Unsupported type for run_date: float"
-
-**Cause:** An old bug in `main.py` — now fixed (uses `datetime.utcnow() + timedelta(seconds=30)`)
-
-**Fix:** Make sure you have the latest `main.py` from this repo.
-
----
-
-### "No zones appearing on map"
-
-**Cause:** Database is empty, no zones have been created.
-
-**Fix:** Click **"🌱 Seed Demo Data"** button in the header, or create a zone manually with the polygon tool.
-
----
-
-### "Backend starts but frontend shows connection error"
-
-**Cause:** CORS issue or wrong API URL.
-
-**Fix:** Check `frontend/.env`:
-```
+```env
 VITE_API_URL=http://localhost:8000
 VITE_WS_URL=ws://localhost:8000
 ```
-Also verify backend `.env` has:
+
+> **Security:** Never commit `.env` files. Use `.env.example` as templates only. `.gitignore` excludes `.env` and `venv/`.
+
+---
+
+## Quick Start
+
+### Prerequisites
+
+- Python **3.11+** (3.12 supported)
+- Node.js **18+**
+- MongoDB Atlas URI (or local MongoDB)
+
+### 1. Clone and configure
+
+```bash
+git clone https://github.com/YOUR_USERNAME/foresense.git
+cd foresense/Foresence
+
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
+# Edit backend/.env with your MongoDB URI
 ```
-CORS_ORIGINS=http://localhost:5173
+
+### 2. Backend
+
+```bash
+cd backend
+python -m venv venv
+
+# Windows PowerShell
+.\venv\Scripts\Activate.ps1
+
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+### 4. Open the app
+
+| URL | Description |
+|-----|-------------|
+| http://localhost:5173 | Web dashboard |
+| http://localhost:8000/docs | Swagger API |
+| http://localhost:8000/api/health | System health |
+
+### 5. First data
+
+Click **Seed Demo Data** in the header, or draw a zone on the map.
+
+---
+
+## Demo Mode
+
+Use demo mode to explore the UI **without** Copernicus or R2 credentials.
+
+```env
+APP_MODE=demo
+ENABLE_DEMO_ROUTES=true
+```
+
+Or call the API directly:
+
+```bash
+curl -X POST http://localhost:8000/api/demo/seed
+curl -X DELETE http://localhost:8000/api/demo/clear
+```
+
+Demo seed creates three sample Indian forest zones, 60 days of NDVI snapshots, and sample alerts.
+
+---
+
+## Deployment
+
+### Backend — Render
+
+`backend/render.yaml` is included. Set all environment variables in the Render dashboard. Use a paid plan for always-on scheduling (free tier may sleep).
+
+### Frontend — Vercel
+
+- Root directory: `frontend`
+- Build: `npm run build`
+- Env: `VITE_API_URL`, `VITE_WS_URL` pointing to your deployed API
+
+### Docker
+
+```bash
+docker build -t foresense-api ./backend
+docker run -p 8000:8000 --env-file backend/.env foresense-api
 ```
 
 ---
 
-### "Scan triggered but no NDVI results"
+## Troubleshooting
 
-**Cause:** Real satellite scan requires Copernicus credentials.
-
-**Fix for demo:** Use the seed endpoint. For real scans, set `COPERNICUS_USERNAME` and `COPERNICUS_PASSWORD` in `.env`.
+| Issue | Solution |
+|-------|----------|
+| Redis URL error | Use a valid `rediss://` Upstash URL, or leave empty for in-memory fallback |
+| No zones on map | Run demo seed or create a zone with the draw tool |
+| Scan returns no data | Configure Copernicus credentials or use demo mode |
+| Frontend cannot reach API | Check `VITE_API_URL` and `CORS_ORIGINS` |
+| `rasterio` install fails (Windows) | `pip install wheel` then `pip install rasterio --only-binary=rasterio` |
+| MongoDB connection timeout | Whitelist IP in Atlas (e.g. `0.0.0.0/0` for dev) |
+| Demo seed 404 | Set `ENABLE_DEMO_ROUTES=true` or `APP_MODE=demo` |
 
 ---
 
-### "rasterio install fails on Windows"
+## Roadmap
 
-**Fix:**
-```powershell
-pip install wheel
-pip install rasterio --only-binary=rasterio
+| Feature | Status |
+|---------|--------|
+| Sentinel-2 NDVI monitoring | ✅ Implemented |
+| Real-time WebSocket alerts | ✅ Implemented |
+| Email + webhook notifications | ✅ Implemented |
+| User authentication (JWT / OAuth) | 🔲 Planned |
+| CNN / ML classification | 🔲 Planned |
+| PDF report export | 🔲 Planned |
+| Multi-satellite (e.g. Landsat) | 🔲 Planned |
+| SMS alerts (Twilio) | 🔲 Planned |
+
+---
+
+## Contributing
+
+1. Fork the repository  
+2. Create a branch: `git checkout -b feature/your-feature`  
+3. Commit your changes  
+4. Push and open a Pull Request  
+
+Please do not commit secrets, `venv/`, or `node_modules/`.
+
+---
+
+## Pushing to GitHub
+
+From the project root (`Foresence` or parent `Deforesense`):
+
+```bash
+git init
+git add .
+git status   # verify .env and venv/ are NOT listed
+git commit -m "Initial commit: Foresense deforestation monitoring platform"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/foresense.git
+git push -u origin main
 ```
-Or install via conda: `conda install rasterio`
+
+Ensure `git status` does not show `backend/.env`, `frontend/.env`, or `backend/venv/` before pushing.
 
 ---
 
-### Backend shows "MongoDB waiting for suitable server"
+## License
 
-**Cause:** Your IP is not whitelisted in MongoDB Atlas Network Access, or the connection string is wrong.
-
-**Fix:**
-1. Go to MongoDB Atlas → Network Access → Add `0.0.0.0/0`
-2. Double-check the connection string has the correct password
+MIT License — see [LICENSE](LICENSE) if present, or add one for open-source distribution.
 
 ---
 
-## 17. Glossary
-
-| Term | Meaning |
-|---|---|
-| **NDVI** | Normalized Difference Vegetation Index. Measures greenness. Formula: `(NIR - Red) / (NIR + Red)`. Ranges -1 to +1. Healthy forest = 0.6–0.9 |
-| **EVI** | Enhanced Vegetation Index. More accurate than NDVI in dense forest. Reduces atmospheric effects |
-| **NIR** | Near-Infrared band. Reflected strongly by healthy leaves |
-| **Sentinel-2** | European Space Agency satellite constellation taking high-resolution (10m) images of Earth every 5 days |
-| **L2A** | Level 2A product — Sentinel-2 data with atmospheric correction applied (ready for vegetation analysis) |
-| **STAC** | SpatioTemporal Asset Catalog. Standard API for discovering satellite data |
-| **GeoJSON** | JSON format for geographic shapes (polygons, points, lines) |
-| **WKT** | Well-Known Text. Another format for geographic shapes, used by some APIs |
-| **Rasterio** | Python library for reading and writing geospatial raster data (satellite image files) |
-| **Cloud Cover** | Percentage of the satellite image obscured by clouds. Images > 30% cloud cover are rejected |
-| **Health Score** | Internal 0–100 score for a zone. Starts at 100, decreases with each detected NDVI drop |
-| **CRS** | Coordinate Reference System. Defines how coordinates map to the real Earth (e.g., WGS84, UTM) |
-| **Motor** | Async Python driver for MongoDB (non-blocking database calls) |
-| **APScheduler** | Python library for running background tasks on a schedule |
-| **WebSocket** | Two-way communication protocol between browser and server. Allows server to push alerts instantly |
-| **Zustand** | Lightweight React state management library (simpler than Redux) |
-| **Pydantic** | Python library for data validation using type hints |
-| **Uvicorn** | ASGI server that runs FastAPI applications |
-
----
-
-## 📄 License
-
-MIT License. See `LICENSE` file.
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create a feature branch: `git checkout -b feature/your-feature`
-3. Commit changes: `git commit -m "Add: your feature description"`
-4. Push: `git push origin feature/your-feature`
-5. Open a Pull Request
-
-## 📬 Contact
-
-For questions, open a GitHub Issue or email the maintainer.
-
----
-
-*Built with ❤️ to protect Earth's forests using open satellite data.*
+<p align="center">
+  Built to protect forests using open satellite data and transparent geospatial analytics.
+</p>

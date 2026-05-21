@@ -36,7 +36,7 @@ def _serialize_zone(doc: dict) -> dict:
 
 
 @router.post("", response_model=dict)
-async def create_zone(zone_data: ZoneCreate):
+async def create_zone(zone_data: ZoneCreate, background_tasks: BackgroundTasks):
     """Create a new forest zone with the given GeoJSON polygon."""
     db = get_db()
 
@@ -62,7 +62,13 @@ async def create_zone(zone_data: ZoneCreate):
     zone_doc["_id"] = str(result.inserted_id)
 
     logger.info(f"Zone created: {zone_data.name} ({area_ha:.1f} ha)")
+
+    # Queue background task to seed historical scans (Pass 1 baseline, Pass 2 current)
+    from app.scheduler.jobs import seed_historical_zone_data
+    background_tasks.add_task(seed_historical_zone_data, zone_doc["_id"])
+
     return {"success": True, "data": zone_doc, "message": "Zone created successfully"}
+
 
 
 @router.get("", response_model=dict)

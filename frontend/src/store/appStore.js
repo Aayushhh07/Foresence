@@ -23,7 +23,8 @@ const useAppStore = create((set, get) => ({
   alertsTotal: 0,
   alertsLoading: false,
   alertsError: null,
-  activeAlertFilters: { severity: '', zone_id: '', status: 'new' },
+  /* Default '' = show all; '' avoids hiding non-new alerts after navigation */
+  activeAlertFilters: { severity: '', zone_id: '', status: '' },
 
   setAlerts: (alerts, total) => set({ alerts, alertsTotal: total }),
   setAlertsLoading: (loading) => set({ alertsLoading: loading }),
@@ -70,7 +71,7 @@ const useAppStore = create((set, get) => ({
 
   // ─── Computed getters ─────────────────────────────────────────────
   getNewAlertsCount: () =>
-    get().alerts.filter((a) => a.status === 'new').length,
+    (Array.isArray(get().alerts) ? get().alerts : []).filter((a) => a?.status === 'new').length,
 
   getZoneById: (id) => get().zones.find((z) => z._id === id),
 }));
