@@ -1,0 +1,64 @@
+[
+  {
+    "name": "Western Ghats Reserve",
+    "description": "Biodiversity hotspot along India's western coast — dense evergreen forest.",
+    "coordinates": [
+      [
+        [76.5, 11.8],
+        [76.9, 11.8],
+        [76.9, 12.2],
+        [76.5, 12.2],
+        [76.5, 11.8]
+      ]
+    ],
+    "ndvi_drop_threshold": 0.15,
+    "confidence_threshold": 0.7
+  },
+  {
+    "name": "Sundarbans Mangrove Belt",
+    "description": "World's largest mangrove forest — critical tiger habitat in West Bengal.",
+    "coordinates": [
+      [
+        [88.8, 21.8],
+        [89.3, 21.8],
+        [89.3, 22.2],
+        [88.8, 22.2],
+        [88.8, 21.8]
+      ]
+    ],
+    "ndvi_drop_threshold": 0.15,
+    "confidence_threshold": 0.7
+  },
+  {
+    "name": "Assam Tropical Forest",
+    "description": "Rich tropical rainforest in northeast India — Indo-Burma biodiversity hotspot.",
+    "coordinates": [
+      [
+        [92.5, 26.5],
+        [93.1, 26.5],
+        [93.1, 27.0],
+        [92.5, 27.0],
+        [92.5, 26.5]
+      ]
+    ],
+    "ndvi_drop_threshold": 0.15,
+    "confidence_threshold": 0.7
+  },
+  {
+    "name": "Kukrail Forest",
+    "description": "Kukrail Reserve Forest, Lucknow, Uttar Pradesh — urban forest belt along the Kukrail stream.",
+    "coordinates": [
+      [
+        [80.962, 26.882],
+        [80.988, 26.884],
+        [80.995, 26.898],
+        [80.982, 26.908],
+        [80.965, 26.905],
+        [80.955, 26.892],
+        [80.962, 26.882]
+      ]
+    ],
+    "ndvi_drop_threshold": 0.12,
+    "confidence_threshold": 0.65
+  }
+]

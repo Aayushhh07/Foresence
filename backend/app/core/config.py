@@ -1,7 +1,12 @@
+from pathlib import Path
 from pydantic_settings import BaseSettings
 from pydantic import field_validator
 from typing import List
 import json
+
+_PREDEFINED_ZONES_FILE = (
+    Path(__file__).resolve().parent.parent / "data" / "predefined_zones.json"
+)
 
 
 class Settings(BaseSettings):
@@ -57,6 +62,15 @@ class Settings(BaseSettings):
 
     @property
     def predefined_zones(self) -> List[dict]:
+        """Load zones from app/data/predefined_zones.json, else from PREDEFINED_ZONES_JSON env."""
+        if _PREDEFINED_ZONES_FILE.is_file():
+            try:
+                with open(_PREDEFINED_ZONES_FILE, encoding="utf-8") as f:
+                    data = json.load(f)
+                if isinstance(data, list) and data:
+                    return data
+            except Exception:
+                pass
         try:
             data = json.loads(self.predefined_zones_json or "[]")
             return data if isinstance(data, list) else []

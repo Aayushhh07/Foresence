@@ -59,6 +59,21 @@ ZONES = [
         "health_score": 78,
         "status": "healthy",
     },
+    {
+        "name": "Kukrail Forest",
+        "description": "Kukrail Reserve Forest, Lucknow, Uttar Pradesh — urban forest along the Kukrail stream.",
+        "geojson": {
+            "type": "Polygon",
+            "coordinates": [[
+                [80.962, 26.882], [80.988, 26.884], [80.995, 26.898],
+                [80.982, 26.908], [80.965, 26.905], [80.955, 26.892],
+                [80.962, 26.882],
+            ]],
+        },
+        "area_ha": 1850.0,
+        "health_score": 72,
+        "status": "healthy",
+    },
 ]
 
 ALERT_TEMPLATES = [
