@@ -42,7 +42,7 @@ export default function ZonePopup({ zone, onClose }) {
     : 'Never scanned';
 
   return (
-    <div className="bg-white rounded-xl shadow-2xl w-72 overflow-hidden animate-slide-in">
+    <div className="bg-white rounded-xl shadow-2xl w-full sm:w-72 max-h-[70vh] sm:max-h-none overflow-y-auto animate-slide-in">
       {/* Header */}
       <div
         className="p-4 pb-3"

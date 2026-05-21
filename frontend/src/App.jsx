@@ -6,6 +6,7 @@ import 'react-toastify/dist/ReactToastify.css';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 import StatusBar from './components/Layout/StatusBar';
+import MobileNav from './components/Layout/MobileNav';
 import MapDashboard from './components/Map/MapDashboard';
 import AlertCenter from './components/Alerts/AlertCenter';
 import RouteErrorBoundary from './components/Layout/RouteErrorBoundary';
@@ -47,15 +48,13 @@ function AppContent() {
   }, []);
 
   return (
-    <div className="flex h-screen overflow-hidden bg-slate-50">
-      {/* Sidebar */}
+    <div className="flex h-[100dvh] overflow-hidden bg-slate-50">
       <Sidebar />
 
-      {/* Main content */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-0 overflow-hidden">
         <Header />
 
-        <main className="flex-1 min-h-0 overflow-hidden flex flex-col">
+        <main className="flex-1 min-h-0 overflow-hidden flex flex-col pb-14 md:pb-0">
           <RouteErrorBoundary>
             <Routes>
               <Route path="/" element={<MapDashboard />} />
@@ -70,9 +69,10 @@ function AppContent() {
         <StatusBar />
       </div>
 
-      {/* Toast notifications */}
+      <MobileNav />
+
       <ToastContainer
-        position="top-right"
+        position="top-center"
         autoClose={5000}
         hideProgressBar={false}
         newestOnTop

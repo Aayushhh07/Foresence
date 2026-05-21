@@ -54,7 +54,7 @@ export default function Sidebar() {
 
   return (
     <aside
-      className={`h-full flex flex-col transition-all duration-300 ease-in-out
+      className={`hidden md:flex h-full flex-col transition-all duration-300 ease-in-out shrink-0
         ${sidebarCollapsed ? 'w-16' : 'w-60'}`}
       style={{ background: '#0f172a', borderRight: '1px solid rgba(255,255,255,0.06)' }}
     >

@@ -58,12 +58,11 @@ export default function AnalyticsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="p-6 space-y-6">
-        {/* Zone selector */}
-        <div className="flex items-center gap-4">
+      <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
           <label className="label whitespace-nowrap">Select Zone</label>
           <select
-            className="input max-w-xs"
+            className="input w-full sm:max-w-xs"
             value={selectedZoneId}
             onChange={(e) => handleZoneChange(e.target.value)}
           >

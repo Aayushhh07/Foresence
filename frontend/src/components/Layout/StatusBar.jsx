@@ -9,11 +9,10 @@ export default function StatusBar() {
 
   return (
     <div
-      className="flex items-center justify-between px-6 py-1.5 text-xs border-t border-slate-200"
+      className="hidden md:flex items-center justify-between px-4 lg:px-6 py-1.5 text-xs border-t border-slate-200 shrink-0"
       style={{ background: '#f8fafc', minHeight: '32px' }}
     >
-      {/* Left: WS status */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-3 lg:gap-4 min-w-0 overflow-x-auto">
         <div className="flex items-center gap-1.5">
           <span className={`status-dot ${wsConnected ? 'connected' : 'offline'}`} />
           <span className={wsConnected ? 'text-green-600 font-medium' : 'text-slate-400'}>

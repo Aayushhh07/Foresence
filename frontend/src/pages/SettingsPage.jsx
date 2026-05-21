@@ -12,7 +12,7 @@ export default function SettingsPage() {
 
   return (
     <div className="flex flex-col h-full overflow-y-auto">
-      <div className="p-6 space-y-8 max-w-4xl mx-auto w-full">
+      <div className="p-3 sm:p-6 space-y-6 sm:space-y-8 max-w-4xl mx-auto w-full">
         {/* Zone Management */}
         <section>
           <div className="flex items-center justify-between mb-4">

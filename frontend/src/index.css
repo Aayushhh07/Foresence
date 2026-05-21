@@ -9,11 +9,34 @@
 
 html, body, #root {
   height: 100%;
+  height: 100dvh;
   margin: 0;
   padding: 0;
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background-color: #f8fafc;
   color: #0f172a;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Mobile safe area (notch / home indicator) */
+.safe-area-pb {
+  padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+}
+
+@media (max-width: 767px) {
+  .leaflet-container {
+    border-radius: 0;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    min-height: 40px;
+  }
+
+  .input,
+  select.input {
+    font-size: 16px; /* prevents iOS zoom on focus */
+  }
 }
 
 /* ─── Scrollbar ─── */
