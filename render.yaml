@@ -1,11 +1,10 @@
-# Render Blueprint — repo root: Foresence/
-# Dashboard: New → Blueprint → connect GitHub repo → Render reads this file.
+# Render Blueprint — paths are relative to REPO ROOT (github.com/Aayushhh07/Foresence)
 services:
   - type: web
     name: foresence-api
     runtime: docker
-    rootDir: backend
-    dockerfilePath: ./Dockerfile
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
     plan: starter
     healthCheckPath: /api/health
     startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
@@ -24,7 +23,6 @@ services:
         value: "0.15"
       - key: CONFIDENCE_THRESHOLD
         value: "0.70"
-      # Set these in Render Dashboard (sync: false = secret / manual entry)
       - key: MONGODB_URI
         sync: false
       - key: UPSTASH_REDIS_URL
