@@ -10,7 +10,11 @@ from bson import ObjectId
 
 from app.core.database import get_db
 from app.models.alert import AlertCreate
-from app.services.email_service import send_deforestation_alert_email
+from app.services.email_service import (
+    send_deforestation_alert_email,
+    resolve_alert_recipients,
+    is_email_configured,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -149,12 +153,12 @@ async def create_alert_if_triggered(
     except Exception as e:
         logger.warning(f"WS alert broadcast failed: {e}")
 
-    # Send email notifications
-    alert_emails = zone.get("alert_emails", [])
-    if alert_emails:
+    # Send automatic email notifications (zone + global recipients)
+    recipients = resolve_alert_recipients(zone)
+    if recipients and is_email_configured():
         try:
             await send_deforestation_alert_email(
-                recipients=alert_emails,
+                recipients=recipients,
                 alert=alert_doc,
                 zone=zone,
             )
@@ -164,6 +168,10 @@ async def create_alert_if_triggered(
             )
         except Exception as e:
             logger.error(f"Email notification failed for zone {zone['name']}: {e}")
+    elif recipients and not is_email_configured():
+        logger.warning(
+            f"Alert for '{zone['name']}' not emailed: configure RESEND_API_KEY or SMTP in .env"
+        )
 
     # Send webhook notification if configured
     webhook_url = zone.get("webhook_url")

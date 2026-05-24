@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { useZones } from '../hooks/useZones';
 import ZoneSettings from '../components/Settings/ZoneSettings';
 import NotificationSettings from '../components/Settings/NotificationSettings';
+import EmailReportPanel from '../components/Settings/EmailReportPanel';
 
 export default function SettingsPage() {
   const { fetchZones, zonesLoading } = useZones();
@@ -30,6 +31,10 @@ export default function SettingsPage() {
             )}
           </div>
           <ZoneSettings />
+        </section>
+
+        <section>
+          <EmailReportPanel />
         </section>
 
         {/* System Status */}

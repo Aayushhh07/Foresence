@@ -48,4 +48,10 @@ export const healthApi = {
   satelliteCheck: (data) => api.post('/api/health/satellite-check', data),
 };
 
+// ─── Notifications (email) ───────────────────────────────────────────
+export const notificationsApi = {
+  emailStatus: () => api.get('/api/notifications/email-status'),
+  sendZoneReport: (data) => api.post('/api/notifications/zone-report', data),
+};
+
 export default api;

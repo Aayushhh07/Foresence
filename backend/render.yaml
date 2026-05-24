@@ -30,10 +30,12 @@ services:
         sync: false
       - key: UPSTASH_REDIS_URL
         sync: false
-      - key: SENDGRID_API_KEY
+      - key: RESEND_API_KEY
         sync: false
       - key: ALERT_FROM_EMAIL
         sync: false
+      - key: EMAIL_PROVIDER
+        value: resend
       - key: SCAN_INTERVAL_HOURS
         value: "12"
       - key: NDVI_DROP_THRESHOLD

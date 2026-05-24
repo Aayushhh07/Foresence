@@ -62,11 +62,28 @@ git push origin main
 ### Step A2 — New Blueprint from GitHub
 
 1. **Dashboard** → **New** → **Blueprint**.
-2. Connect your **GitHub** account and select the **Foresense** repository.
-3. Render should detect `render.yaml` at the **repository root** (`Foresence/render.yaml`).
+2. Connect your **GitHub** account and select the **Foresence** repository.
+3. Render should detect `render.yaml` at the **repository root**.
 4. Click **Apply** (do not deploy yet if it asks to confirm env vars).
 
-> If your GitHub repo root is the parent folder `Deforesense/` (not `Foresence/`), set Blueprint path to `Foresence/render.yaml` in Render, or move `render.yaml` to match your repo root.
+### Step A2b — Docker paths (required if you created the service manually)
+
+Your Dockerfile lives in **`backend/`**, not the repo root. In Render → **foresence-api** → **Settings** → **Build & Deploy**:
+
+| Field | Value |
+|-------|--------|
+| **Dockerfile Path** | `./backend/Dockerfile` |
+| **Docker Build Context Directory** | `./backend` |
+
+If these are wrong, you get: `open Dockerfile: no such file or directory`.
+
+**Start command** (also under Settings):
+
+```
+uvicorn app.main:app --host 0.0.0.0 --port $PORT --workers 1
+```
+
+Save → **Manual Deploy** → **Deploy latest commit**.
 
 ### Step A3 — Set environment variables on Render
 
@@ -241,6 +258,7 @@ Render
 | Env changed on Vercel but app unchanged | **Redeploy** Vercel after changing `VITE_*` |
 | Wrong Root Directory on Vercel | Must be `frontend` (or `Foresence/frontend`) |
 | Blueprint not found | `render.yaml` must be at repo root Render uses |
+| `open Dockerfile: no such file` | Set Dockerfile Path to `./backend/Dockerfile` and Build Context to `./backend` |
 
 ---
 

@@ -58,6 +58,13 @@ export function useWebSocket() {
           break;
 
         case 'scan_complete':
+          useAppStore.getState().setLastZoneScan({
+            zone_id: msg.zone_id,
+            zone_name: msg.zone_name,
+            ndvi_mean: msg.ndvi_mean,
+            at: Date.now(),
+          });
+          useAppStore.getState().setLastScanAt(new Date().toISOString());
           console.log(`[WS] Scan complete for zone: ${msg.zone_name}, NDVI: ${msg.ndvi_mean?.toFixed(3)}`);
           break;
 

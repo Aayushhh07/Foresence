@@ -13,7 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import connect_db, close_db
 from app.core.redis_client import connect_redis, close_redis
-from app.api.routes import zones, alerts, snapshots, health, demo
+from app.api.routes import zones, alerts, snapshots, health, demo, notifications
 from app.api.websocket import router as ws_router
 from app.scheduler.scheduler import start_scheduler, stop_scheduler
 
@@ -143,6 +143,7 @@ app.include_router(zones.router)
 app.include_router(alerts.router)
 app.include_router(snapshots.router)
 app.include_router(health.router)
+app.include_router(notifications.router)
 if settings.enable_demo_routes or settings.app_mode == "demo":
     app.include_router(demo.router)
 app.include_router(ws_router)

@@ -41,10 +41,18 @@ services:
         sync: false
       - key: CLOUDFLARE_R2_PUBLIC_URL
         sync: false
-      - key: SENDGRID_API_KEY
+      - key: RESEND_API_KEY
         sync: false
       - key: ALERT_FROM_EMAIL
         sync: false
+      - key: ALERT_FROM_NAME
+        value: Foresence Alerts
+      - key: EMAIL_PROVIDER
+        value: resend
+      - key: GLOBAL_ALERT_EMAILS
+        sync: false
+      - key: AUTO_EMAIL_ON_ALERT
+        value: "true"
       - key: CORS_ORIGINS
         sync: false
       - key: FRONTEND_URL

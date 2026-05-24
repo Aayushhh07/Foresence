@@ -59,10 +59,12 @@ const useAppStore = create((set, get) => ({
   // ─── System Health ────────────────────────────────────────────────
   systemHealth: null,
   lastScanAt: null,
+  lastZoneScan: null,
   wsConnected: false,
 
   setSystemHealth: (health) => set({ systemHealth: health }),
   setLastScanAt: (time) => set({ lastScanAt: time }),
+  setLastZoneScan: (payload) => set({ lastZoneScan: payload }),
   setWsConnected: (connected) => set({ wsConnected: connected }),
 
   // ─── UI State ─────────────────────────────────────────────────────

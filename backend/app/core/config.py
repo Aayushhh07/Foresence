@@ -35,9 +35,18 @@ class Settings(BaseSettings):
     # Redis (optional — falls back to in-memory locks)
     upstash_redis_url: str = ""
 
-    # SendGrid (optional — emails skipped if not set)
-    sendgrid_api_key: str = "SG.demo"
-    alert_from_email: str = "demo@demo.com"
+    # Email — Resend (free 100/day) or SMTP e.g. Brevo (free 300/day)
+    email_provider: str = "resend"  # resend | smtp
+    resend_api_key: str = ""
+    alert_from_email: str = ""
+    alert_from_name: str = "Foresence Alerts"
+    smtp_host: str = ""
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: bool = True
+    global_alert_emails: str = ""
+    auto_email_on_alert: bool = True
 
     # Scan config
     scan_interval_hours: int = 12
@@ -59,6 +68,24 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.cors_origins.split(",")]
+
+    @property
+    def global_alert_emails_list(self) -> List[str]:
+        if not self.global_alert_emails.strip():
+            return []
+        return [e.strip() for e in self.global_alert_emails.split(",") if e.strip()]
+
+    @property
+    def effective_email_provider(self) -> str:
+        """Pick provider: explicit EMAIL_PROVIDER, else auto-detect from credentials."""
+        explicit = (self.email_provider or "").strip().lower()
+        if explicit in {"resend", "smtp"}:
+            return explicit
+        if (self.resend_api_key or "").strip():
+            return "resend"
+        if self.smtp_host.strip() and self.smtp_username.strip():
+            return "smtp"
+        return "resend"
 
     @property
     def predefined_zones(self) -> List[dict]:

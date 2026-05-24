@@ -4,19 +4,49 @@ import { snapshotsApi, alertsApi } from '../services/api';
 import useAppStore from '../store/appStore';
 import NDVIChart from '../components/Analytics/NDVIChart';
 import ChangeAreaChart from '../components/Analytics/ChangeAreaChart';
+import RecentScanImages from '../components/Analytics/RecentScanImages';
 
 export default function AnalyticsPage() {
   const { zones, snapshots, setSnapshots, setSnapshotsLoading, snapshotsLoading } = useAppStore();
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedZoneId, setSelectedZoneId] = useState(searchParams.get('zone') || '');
   const [alerts30, setAlerts30] = useState([]);
+  const [recentSnapshots, setRecentSnapshots] = useState([]);
+  const [recentLoading, setRecentLoading] = useState(false);
   const [statsLoading, setStatsLoading] = useState(false);
+  const lastZoneScan = useAppStore((s) => s.lastZoneScan);
+
+  const fetchRecentImages = async (zoneId) => {
+    if (!zoneId) return;
+    setRecentLoading(true);
+    try {
+      const res = await snapshotsApi.list({ zone_id: zoneId, limit: 2 });
+      setRecentSnapshots(res.data.data || []);
+    } catch (err) {
+      console.error('Recent snapshots fetch error:', err.message);
+    } finally {
+      setRecentLoading(false);
+    }
+  };
 
   useEffect(() => {
     if (selectedZoneId) {
       fetchData(selectedZoneId);
+      fetchRecentImages(selectedZoneId);
+    } else {
+      setRecentSnapshots([]);
     }
   }, [selectedZoneId]);
+
+  useEffect(() => {
+    if (
+      selectedZoneId &&
+      lastZoneScan?.zone_id === selectedZoneId
+    ) {
+      fetchRecentImages(selectedZoneId);
+      fetchData(selectedZoneId);
+    }
+  }, [lastZoneScan?.at, selectedZoneId]);
 
   const fetchData = async (zoneId) => {
     setStatsLoading(true);
@@ -115,6 +145,12 @@ export default function AnalyticsPage() {
                 )}
               </div>
             </div>
+
+            <RecentScanImages
+              snapshots={recentSnapshots}
+              loading={recentLoading}
+              onRefresh={() => fetchRecentImages(selectedZoneId)}
+            />
 
             {/* NDVI Chart */}
             <div className="card p-5">
